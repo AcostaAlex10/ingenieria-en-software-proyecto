@@ -30,3 +30,26 @@ CREATE TABLE IF NOT EXISTS proyecto (
   avance       DECIMAL(5,2) NOT NULL DEFAULT 0,
   presupuesto  DECIMAL(15,2) NOT NULL
 );
+
+-- Planificacion de cada obra (una por proyecto): avance esperado total.
+-- id_proyecto es UNIQUE -> relacion 1 a 1 con proyecto.
+CREATE TABLE IF NOT EXISTS planificacion (
+  id_planificacion      INT AUTO_INCREMENT PRIMARY KEY,
+  avance_esperado_total DECIMAL(5,2) NOT NULL,
+  fecha_carga           DATE NOT NULL,
+  id_proyecto           INT NOT NULL UNIQUE,
+  CONSTRAINT fk_planificacion_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);
+
+-- Avances fisicos diarios cargados contra una planificacion.
+CREATE TABLE IF NOT EXISTS avance_fisico (
+  id_avance          INT AUTO_INCREMENT PRIMARY KEY,
+  cantidad_ejecutada DECIMAL(12,2) NOT NULL,
+  porcentaje_avance  DECIMAL(5,2) NOT NULL,
+  fecha              DATE NOT NULL,
+  observaciones      TEXT,
+  id_planificacion   INT NOT NULL,
+  CONSTRAINT fk_avance_planificacion FOREIGN KEY (id_planificacion)
+    REFERENCES planificacion(id_planificacion) ON DELETE CASCADE
+);

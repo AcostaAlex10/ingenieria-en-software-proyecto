@@ -11,6 +11,8 @@ require_once __DIR__ . '/../src/AuthController.php';
 require_once __DIR__ . '/../src/ProyectoRepositoryInterface.php';
 require_once __DIR__ . '/../src/MySqlProyectoRepository.php';
 require_once __DIR__ . '/../src/ProyectoController.php';
+require_once __DIR__ . '/../src/PlanificacionController.php';
+require_once __DIR__ . '/../src/AvanceController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -30,10 +32,10 @@ $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 
 $db = Database::conexion();
 
-// Repositorio MariaDB (antes era JsonProyectoRepository; el controlador no cambia).
-$repositorio = new MySqlProyectoRepository($db);
-$controlador = new ProyectoController($repositorio);
+$controlador = new ProyectoController(new MySqlProyectoRepository($db));
 $auth = new AuthController($db, $jwtSecreto, $jwtSegundos);
+$planificacion = new PlanificacionController($db);
+$avance = new AvanceController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -45,7 +47,7 @@ $metodoHttp = $_SERVER['REQUEST_METHOD'];
 $recurso = $segmentos[0] ?? null;
 
 // ============================================================
-//  Rutas de autenticacion:  /auth/login, /auth/register, /auth/me
+//  Autenticacion:  /auth/login, /auth/register, /auth/me
 // ============================================================
 if ($recurso === 'auth') {
     $accion = $segmentos[1] ?? null;
@@ -57,27 +59,18 @@ if ($recurso === 'auth') {
 
         case $metodoHttp === 'POST' && $accion === 'register':
             $solicitante = AuthMiddleware::usuarioAutenticado($jwtSecreto);
-            if ($solicitante === null) {
-                http_response_code(401);
-                echo json_encode(['error' => 'Falta el token de autenticacion']);
-                break;
-            }
+            if ($solicitante === null) { noAutenticado(); break; }
             $auth->registrar(leerCuerpoJson(), $solicitante);
             break;
 
         case $metodoHttp === 'GET' && $accion === 'me':
             $solicitante = AuthMiddleware::usuarioAutenticado($jwtSecreto);
-            if ($solicitante === null) {
-                http_response_code(401);
-                echo json_encode(['error' => 'Falta el token de autenticacion']);
-                break;
-            }
+            if ($solicitante === null) { noAutenticado(); break; }
             $auth->yo($solicitante);
             break;
 
         default:
-            http_response_code(404);
-            echo json_encode(['error' => 'Ruta de autenticacion no encontrada']);
+            responder(404, ['error' => 'Ruta de autenticacion no encontrada']);
     }
     exit;
 }
@@ -91,46 +84,91 @@ if ($recurso === 'health') {
 }
 
 // ============================================================
-//  Rutas de proyectos:  /proyectos  (RF01)
+//  Planificacion y Avances:  /planificacion/...
 // ============================================================
-if ($recurso !== 'proyectos') {
-    http_response_code(404);
-    echo json_encode(['error' => 'Recurso no encontrado']);
+if ($recurso === 'planificacion') {
+    // /planificacion/avance/{id}  -> un avance puntual
+    if (($segmentos[1] ?? null) === 'avance') {
+        $idAvance = $segmentos[2] ?? null;
+        if ($idAvance === null) { responder(404, ['error' => 'Falta el id del avance']); exit; }
+        switch ($metodoHttp) {
+            case 'GET':    $avance->mostrar($idAvance); break;
+            case 'PUT':    $avance->actualizar($idAvance, leerCuerpoJson()); break;
+            case 'DELETE': $avance->eliminar($idAvance); break;
+            default:       responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // /planificacion/{planId}/avances[/resumen]
+    if (($segmentos[2] ?? null) === 'avances') {
+        $planId = $segmentos[1];
+        if (($segmentos[3] ?? null) === 'resumen') {
+            if ($metodoHttp === 'GET') { $avance->resumen($planId); }
+            else { responder(405, ['error' => 'Metodo no permitido']); }
+            exit;
+        }
+        switch ($metodoHttp) {
+            case 'GET':  $avance->listarPorPlan($planId); break;
+            case 'POST': $avance->crear($planId, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // /planificacion/{id}  -> PUT / DELETE de la planificacion
+    $idPlan = $segmentos[1] ?? null;
+    if ($idPlan === null) { responder(404, ['error' => 'Falta el id de planificacion']); exit; }
+    switch ($metodoHttp) {
+        case 'PUT':    $planificacion->actualizar($idPlan, leerCuerpoJson()); break;
+        case 'DELETE': $planificacion->eliminar($idPlan); break;
+        default:       responder(405, ['error' => 'Metodo no permitido']);
+    }
     exit;
 }
 
-$id = $segmentos[1] ?? null;
+// ============================================================
+//  Proyectos:  /proyectos  y  /proyectos/{id}/planificacion
+// ============================================================
+if ($recurso === 'proyectos') {
+    $id = $segmentos[1] ?? null;
 
-switch (true) {
-    case $metodoHttp === 'GET' && $id === null:
-        $controlador->listar($_GET['q'] ?? null);
-        break;
+    // Sub-recurso: /proyectos/{id}/planificacion
+    if (($segmentos[2] ?? null) === 'planificacion') {
+        switch ($metodoHttp) {
+            case 'GET':  $planificacion->obtenerPorProyecto($id); break;
+            case 'POST': $planificacion->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
 
-    case $metodoHttp === 'GET' && $id !== null:
-        $controlador->mostrar($id);
-        break;
-
-    case $metodoHttp === 'POST' && $id === null:
-        $controlador->registrar(leerCuerpoJson());
-        break;
-
-    case $metodoHttp === 'PUT' && $id !== null:
-        $controlador->modificar($id, leerCuerpoJson());
-        break;
-
-    case $metodoHttp === 'DELETE' && $id !== null:
-        $controlador->eliminar($id);
-        break;
-
-    default:
-        http_response_code(405);
-        echo json_encode(['error' => 'Metodo no permitido para esta ruta']);
+    switch (true) {
+        case $metodoHttp === 'GET' && $id === null:    $controlador->listar($_GET['q'] ?? null); break;
+        case $metodoHttp === 'GET' && $id !== null:    $controlador->mostrar($id); break;
+        case $metodoHttp === 'POST' && $id === null:   $controlador->registrar(leerCuerpoJson()); break;
+        case $metodoHttp === 'PUT' && $id !== null:    $controlador->modificar($id, leerCuerpoJson()); break;
+        case $metodoHttp === 'DELETE' && $id !== null: $controlador->eliminar($id); break;
+        default: responder(405, ['error' => 'Metodo no permitido para esta ruta']);
+    }
+    exit;
 }
 
+responder(404, ['error' => 'Recurso no encontrado']);
+
+// ------------------------------------------------------------
 /** @return array<string, mixed> */
 function leerCuerpoJson(): array
 {
-    $input = file_get_contents('php://input');
-    $datos = json_decode($input, true);
+    $datos = json_decode(file_get_contents('php://input'), true);
     return is_array($datos) ? $datos : [];
+}
+function responder(int $codigo, mixed $cuerpo): void
+{
+    http_response_code($codigo);
+    echo json_encode($cuerpo, JSON_UNESCAPED_UNICODE);
+}
+function noAutenticado(): void
+{
+    responder(401, ['error' => 'Falta el token de autenticacion']);
 }
