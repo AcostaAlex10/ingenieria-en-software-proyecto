@@ -4,6 +4,7 @@ import LoginPage from "./components/LoginPage";
 import RequireAuth from "./auth/RequireAuth";
 import Dashboard from "./components/Dashboard";
 import ProyectosPage from "./components/ProyectosPage";
+import ProyectoDetallePage from "./components/ProyectoDetallePage";
 import SeguimientoPage from "./components/SeguimientoPage";
 import MaterialesPage from "./components/MaterialesPage";
 import DocumentacionPage from "./components/DocumentacionPage";
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: Dashboard },
       { path: "proyectos", Component: ProyectosPage },
+      { path: "proyectos/:id", Component: ProyectoDetallePage },
       { path: "seguimiento", Component: SeguimientoPage },
       { path: "materiales", Component: MaterialesPage },
       { path: "documentacion", Component: DocumentacionPage },

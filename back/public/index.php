@@ -18,6 +18,13 @@ Env::cargar(__DIR__ . '/../.env');
 
 Cors::enviarHeaders();
 
+// Bajo el servidor embebido de PHP (php -S, mono-hilo) cerramos la conexion
+// despues de cada respuesta para que no se bloquee con las conexiones del
+// navegador. En Apache/produccion no aplica (se mantiene keep-alive).
+if (php_sapi_name() === 'cli-server') {
+    header('Connection: close');
+}
+
 // Preflight CORS (el navegador manda OPTIONS antes de POST/PUT/DELETE).
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
