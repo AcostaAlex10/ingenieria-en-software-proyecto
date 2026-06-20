@@ -183,7 +183,10 @@ final class AuthController
 
         if ($usuario !== false) {
             $token = bin2hex(random_bytes(16));
-            $expira = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
+            // Vencimiento en UTC (1 hora) para que coincida con el NOW() de la
+            // base (que esta en UTC). gmdate siempre devuelve UTC, sin importar
+            // la zona horaria por defecto de PHP.
+            $expira = gmdate('Y-m-d H:i:s', time() + 3600);
             $this->db->prepare('UPDATE usuario SET reset_token = ?, reset_expira = ? WHERE id_usuario = ?')
                 ->execute([$token, $expira, (int) $usuario['id_usuario']]);
 
