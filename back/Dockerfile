@@ -7,11 +7,12 @@ FROM php:8.3-apache
 # Extension para conectarse a MariaDB / MySQL (PDO).
 RUN docker-php-ext-install pdo_mysql
 
-# Habilitar reescritura de URLs (la usa public/.htaccess para enrutar a index.php)
-# y dejar la raiz del sitio en la carpeta public/.
+# Dejar la raiz del sitio en public/ y enrutar TODO lo que no sea un archivo
+# real a index.php mediante FallbackResource (no depende de .htaccess ni de
+# que AllowOverride este activo: es robusto en cualquier Apache).
 RUN a2enmod rewrite \
  && sed -ri 's!DocumentRoot /var/www/html!DocumentRoot /var/www/html/public!' /etc/apache2/sites-available/000-default.conf \
- && printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' > /etc/apache2/conf-available/sgso.conf \
+ && printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n    FallbackResource /index.php\n</Directory>\n' > /etc/apache2/conf-available/sgso.conf \
  && a2enconf sgso
 
 # Copiar el codigo del backend (el contexto de build es la carpeta back/).
