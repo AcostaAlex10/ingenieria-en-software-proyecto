@@ -64,6 +64,33 @@ export async function login(email: string, contrasena: string): Promise<LoginRes
   return res.json() as Promise<LoginResponse>;
 }
 
+/** Recuperacion de contrasena - paso 1: pedir el email de recuperacion. */
+export async function olvideContrasena(email: string): Promise<string> {
+  const res = await fetchConReintentos(`${API_URL}/auth/olvide`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "No se pudo procesar la solicitud");
+  return data.mensaje ?? "Listo";
+}
+
+/** Recuperacion de contrasena - paso 2: definir la nueva con el token del email. */
+export async function restablecerContrasena(token: string, contrasena: string): Promise<string> {
+  const res = await fetchConReintentos(`${API_URL}/auth/restablecer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, contrasena }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const porCampo = data.errors ? Object.values(data.errors).join(". ") : null;
+    throw new Error(data.error ?? porCampo ?? "No se pudo cambiar la contraseña");
+  }
+  return data.mensaje ?? "Contraseña actualizada";
+}
+
 /**
  * Wrapper de fetch para llamadas autenticadas: agrega automaticamente el header
  * Authorization: Bearer <token> y reintenta si el backend esta arrancando.

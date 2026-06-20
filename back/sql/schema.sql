@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS usuario (
   -- Identificador de la sesion activa: cada login lo regenera, invalidando la
   -- sesion anterior (un usuario no puede estar logueado en dos lados a la vez).
   sesion_token   VARCHAR(64) NULL,
+  -- Recuperacion de contrasena: token enviado por email y su vencimiento.
+  reset_token    VARCHAR(64) NULL,
+  reset_expira   DATETIME NULL,
   fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

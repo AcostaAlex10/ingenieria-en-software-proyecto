@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/Jwt.php';
+require_once __DIR__ . '/Mailer.php';
 
 /**
  * Controlador de autenticacion (login). Equivalente PHP del backend de
@@ -158,6 +159,82 @@ final class AuthController
         }
 
         $this->json(200, ['usuario' => $solicitante]);
+    }
+
+    /**
+     * Paso 1 de recuperacion: el usuario ingresa su email y le enviamos un
+     * enlace con un token temporal (vence en 1 hora).
+     * Por seguridad respondemos siempre 200, exista o no el email.
+     * @param array<string, mixed> $datos
+     */
+    public function olvide(array $datos): void
+    {
+        $email = trim((string) ($datos['email'] ?? ''));
+        $respuestaGenerica = ['mensaje' => 'Si el email está registrado, te enviamos instrucciones para recuperar la contraseña.'];
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->json(200, $respuestaGenerica);
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT id_usuario, nombre FROM usuario WHERE email = ?');
+        $stmt->execute([$email]);
+        $usuario = $stmt->fetch();
+
+        if ($usuario !== false) {
+            $token = bin2hex(random_bytes(16));
+            $expira = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
+            $this->db->prepare('UPDATE usuario SET reset_token = ?, reset_expira = ? WHERE id_usuario = ?')
+                ->execute([$token, $expira, (int) $usuario['id_usuario']]);
+
+            $base = rtrim(getenv('APP_URL') ?: (getenv('CORS_ORIGIN') ?: ''), '/');
+            $enlace = $base . '/restablecer?token=' . $token;
+            $html = '<h2>Recuperación de contraseña - SGSO</h2>'
+                . '<p>Hola ' . htmlspecialchars((string) $usuario['nombre']) . ',</p>'
+                . '<p>Para definir una nueva contraseña, hacé clic en el siguiente enlace (vence en 1 hora):</p>'
+                . '<p><a href="' . htmlspecialchars($enlace) . '">' . htmlspecialchars($enlace) . '</a></p>'
+                . '<p>Si no solicitaste esto, ignorá este correo.</p>';
+
+            Mailer::enviar($email, 'Recuperá tu contraseña - SGSO', $html);
+        }
+
+        $this->json(200, $respuestaGenerica);
+    }
+
+    /**
+     * Paso 2 de recuperacion: con el token del email, el usuario define una
+     * contrasena nueva.
+     * @param array<string, mixed> $datos
+     */
+    public function restablecer(array $datos): void
+    {
+        $token = trim((string) ($datos['token'] ?? ''));
+        $contrasena = (string) ($datos['contrasena'] ?? '');
+
+        if ($token === '') {
+            $this->json(400, ['error' => 'Falta el token']);
+            return;
+        }
+        if (strlen($contrasena) < 6) {
+            $this->json(422, ['errors' => ['contrasena' => 'Debe tener al menos 6 caracteres']]);
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT id_usuario FROM usuario WHERE reset_token = ? AND reset_expira > NOW()');
+        $stmt->execute([$token]);
+        $usuario = $stmt->fetch();
+
+        if ($usuario === false) {
+            $this->json(400, ['error' => 'El enlace no es válido o venció. Pedí uno nuevo.']);
+            return;
+        }
+
+        // Nueva contrasena + invalidar el token y cualquier sesion activa.
+        $hash = password_hash($contrasena, PASSWORD_BCRYPT);
+        $this->db->prepare('UPDATE usuario SET contrasena = ?, reset_token = NULL, reset_expira = NULL, sesion_token = NULL WHERE id_usuario = ?')
+            ->execute([$hash, (int) $usuario['id_usuario']]);
+
+        $this->json(200, ['mensaje' => 'Contraseña actualizada. Ya podés iniciar sesión.']);
     }
 
     private function json(int $codigoHttp, mixed $cuerpo): void

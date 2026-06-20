@@ -69,6 +69,14 @@ if ($recurso === 'auth') {
             $auth->login(leerCuerpoJson());
             break;
 
+        case $metodoHttp === 'POST' && $accion === 'olvide':
+            $auth->olvide(leerCuerpoJson());
+            break;
+
+        case $metodoHttp === 'POST' && $accion === 'restablecer':
+            $auth->restablecer(leerCuerpoJson());
+            break;
+
         case $metodoHttp === 'POST' && $accion === 'register':
             $solicitante = AuthMiddleware::usuarioAutenticado($jwtSecreto);
             if ($solicitante === null) { noAutenticado(); break; }

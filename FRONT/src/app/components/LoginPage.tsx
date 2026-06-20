@@ -127,6 +127,12 @@ export default function LoginPage() {
         >
           {cargando ? "Ingresando..." : "Ingresar"}
         </button>
+
+        <div style={{ textAlign: "center", marginTop: "16px" }}>
+          <a href="/olvide" style={{ fontSize: "12px", color: "var(--muted-foreground)" }}>
+            ¿Olvidaste tu contraseña?
+          </a>
+        </div>
       </form>
     </div>
   );
