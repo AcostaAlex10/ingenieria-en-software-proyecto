@@ -12,12 +12,45 @@ export interface LoginResponse {
   usuario: UsuarioSesion;
 }
 
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * fetch con reintentos. Los hostings gratuitos (ej. Render) "duermen" el backend
+ * tras un rato de inactividad; la primera peticion lo despierta y puede fallar
+ * con un error de red o un 502/503/504 mientras arranca (~50s). En vez de cortar
+ * con "Failed to fetch", reintentamos hasta que el backend responde.
+ */
+async function fetchConReintentos(
+  url: string,
+  options: RequestInit,
+  maxIntentos = 20,
+  esperaMs = 3000
+): Promise<Response> {
+  let ultimoError: unknown = null;
+  for (let i = 0; i < maxIntentos; i++) {
+    try {
+      const res = await fetch(url, options);
+      // Backend arrancando: reintentar.
+      if ((res.status === 502 || res.status === 503 || res.status === 504) && i < maxIntentos - 1) {
+        await esperar(esperaMs);
+        continue;
+      }
+      return res;
+    } catch (e) {
+      // Error de red (incluye el CORS del backend dormido): reintentar.
+      ultimoError = e;
+      if (i < maxIntentos - 1) await esperar(esperaMs);
+    }
+  }
+  throw ultimoError ?? new Error("No se pudo conectar con el servidor");
+}
+
 /**
  * Llama a POST /auth/login. Si las credenciales son invalidas, el backend
  * responde con un status de error y un { error } que convertimos en Error.
  */
 export async function login(email: string, contrasena: string): Promise<LoginResponse> {
-  const res = await fetch(`${API_URL}/auth/login`, {
+  const res = await fetchConReintentos(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, contrasena }),
@@ -33,9 +66,8 @@ export async function login(email: string, contrasena: string): Promise<LoginRes
 
 /**
  * Wrapper de fetch para llamadas autenticadas: agrega automaticamente el header
- * Authorization: Bearer <token>. Si el backend responde 401 (token vencido o
- * invalido), limpia la sesion para forzar un nuevo login.
- * Lo usaran las pantallas que consumen la API protegida (RF01/RF02, etc.).
+ * Authorization: Bearer <token> y reintenta si el backend esta arrancando.
+ * Si el backend responde 401 (token vencido o invalido), limpia la sesion.
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
@@ -43,7 +75,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetchConReintentos(`${API_URL}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     clearSession();
