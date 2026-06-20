@@ -16,6 +16,9 @@ import {
 
 const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "" };
 
+// Fecha de hoy (YYYY-MM-DD) para no permitir fechas de inicio en el pasado.
+const HOY = new Date().toISOString().slice(0, 10);
+
 function estadoBadge(estado: string) {
   switch (estado) {
     case "en_ejecucion": return <Badge className="bg-green-600">En Ejecución</Badge>;
@@ -221,7 +224,7 @@ export default function ProyectosPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fecha">Fecha de Inicio *</Label>
-                <Input id="fecha" type="date" value={form.fechaInicio} onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })} required />
+                <Input id="fecha" type="date" min={HOY} value={form.fechaInicio} onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })} required />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="presupuesto">Presupuesto Estimado (ARS) *</Label>

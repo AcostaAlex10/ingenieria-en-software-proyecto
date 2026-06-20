@@ -47,6 +47,14 @@ final class ProyectoController
     {
         $errores = $this->validar($datos);
 
+        // La fecha de inicio no puede ser anterior a hoy (solo al registrar).
+        if (
+            isset($datos['fechaInicio']) && trim((string) $datos['fechaInicio']) !== ''
+            && (string) $datos['fechaInicio'] < date('Y-m-d')
+        ) {
+            $errores['fechaInicio'] = 'La fecha de inicio no puede ser anterior a hoy';
+        }
+
         if (!empty($errores)) {
             $this->responderJson(422, ['errors' => $errores]);
             return;
