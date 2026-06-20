@@ -44,8 +44,10 @@ export interface Resumen {
 async function parse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = (data as { error?: string }).error ?? "Error en la solicitud";
-    throw new Error(msg);
+    const d = data as { error?: string; errors?: Record<string, string> };
+    // Errores por campo (422): los unimos en un mensaje legible.
+    const porCampo = d.errors ? Object.values(d.errors).join(". ") : null;
+    throw new Error(d.error ?? porCampo ?? "Error en la solicitud");
   }
   return data as T;
 }

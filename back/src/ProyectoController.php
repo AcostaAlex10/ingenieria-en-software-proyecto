@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/ProyectoRepositoryInterface.php';
+require_once __DIR__ . '/Geocoder.php';
 
 /**
  * Controlador de Proyectos. No sabe nada de JSON-en-archivo ni de
@@ -119,6 +120,16 @@ final class ProyectoController
 
         if (isset($datos['presupuesto']) && trim((string) $datos['presupuesto']) !== '' && !is_numeric($datos['presupuesto'])) {
             $errores['presupuesto'] = 'Debe ser un número';
+        }
+
+        // La ubicacion debe corresponder a un lugar real (OpenStreetMap).
+        // Solo si no falto como obligatoria.
+        if (
+            !isset($errores['ubicacion'])
+            && isset($datos['ubicacion']) && trim((string) $datos['ubicacion']) !== ''
+            && !Geocoder::existe((string) $datos['ubicacion'])
+        ) {
+            $errores['ubicacion'] = 'No se encontró esa ubicación. Ingresá una localidad real.';
         }
 
         return $errores;
