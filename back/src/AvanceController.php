@@ -81,6 +81,9 @@ final class AvanceController
             $planId,
         ]);
 
+        // Transicion automatica de estado de la obra segun sus avances.
+        $this->sincronizarProyecto($planId);
+
         $this->json(201, [
             'id_avance' => (int) $this->db->lastInsertId(),
             'id_planificacion' => (int) $planId,
@@ -132,19 +135,71 @@ final class AvanceController
             array_key_exists('observaciones', $datos) ? $datos['observaciones'] : $actual['observaciones'],
             $id,
         ]);
+
+        // El porcentaje pudo cambiar -> recalcular estado/avance de la obra.
+        $this->sincronizarProyecto((string) $actual['id_planificacion']);
+
         $this->json(200, ['mensaje' => 'Avance actualizado']);
     }
 
     /** DELETE /api/planificacion/avance/{id} */
     public function eliminar(string $id): void
     {
-        $stmt = $this->db->prepare('DELETE FROM avance_fisico WHERE id_avance = ?');
+        // Necesitamos la planificacion antes de borrar para recalcular la obra.
+        $stmt = $this->db->prepare('SELECT id_planificacion FROM avance_fisico WHERE id_avance = ?');
         $stmt->execute([$id]);
-        if ($stmt->rowCount() === 0) {
+        $avance = $stmt->fetch();
+        if ($avance === false) {
             $this->json(404, ['error' => 'Registro de avance no encontrado']);
             return;
         }
+
+        $stmt = $this->db->prepare('DELETE FROM avance_fisico WHERE id_avance = ?');
+        $stmt->execute([$id]);
+
+        $this->sincronizarProyecto((string) $avance['id_planificacion']);
+
         $this->json(200, ['mensaje' => 'Avance eliminado']);
+    }
+
+    /**
+     * Transicion automatica del estado de la OBRA segun los avances cargados
+     * en su planificacion (RF: ciclo de vida del proyecto):
+     *   - primer avance (> 0%) estando en 'planificacion' -> 'en_ejecucion'
+     *   - el avance llega a 100% -> 'finalizada'
+     * Una obra 'pausada' o ya 'finalizada' no se reactiva sola (decision manual).
+     * Ademas refleja el avance real (mayor porcentaje cargado) en proyecto.avance,
+     * que es lo que muestran el dashboard y el listado.
+     */
+    private function sincronizarProyecto(string $planId): void
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.id_proyecto, p.estado
+             FROM planificacion pl
+             JOIN proyecto p ON p.id_proyecto = pl.id_proyecto
+             WHERE pl.id_planificacion = ?'
+        );
+        $stmt->execute([$planId]);
+        $proyecto = $stmt->fetch();
+        if ($proyecto === false) {
+            return; // planificacion sin proyecto asociado (no deberia ocurrir)
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT COALESCE(MAX(porcentaje_avance), 0) FROM avance_fisico WHERE id_planificacion = ?'
+        );
+        $stmt->execute([$planId]);
+        $avanceReal = (float) $stmt->fetchColumn();
+
+        $estado = $proyecto['estado'];
+        if ($avanceReal >= 100) {
+            $estado = 'finalizada';
+        } elseif ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
+            $estado = 'en_ejecucion';
+        }
+
+        $stmt = $this->db->prepare('UPDATE proyecto SET avance = ?, estado = ? WHERE id_proyecto = ?');
+        $stmt->execute([$avanceReal, $estado, $proyecto['id_proyecto']]);
     }
 
     /** @param array<string,mixed> $datos @return array<string,string> */
