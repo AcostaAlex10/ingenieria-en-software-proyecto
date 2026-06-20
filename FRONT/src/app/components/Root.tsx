@@ -14,8 +14,10 @@ import {
   LogOut,
 } from "lucide-react";
 import { Toaster } from "./ui/sonner";
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { getUsuario, clearSession } from "../auth/session";
+import { apiFetch } from "../auth/api";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, abbr: "DSH" },
@@ -59,6 +61,28 @@ export default function Root() {
 
   // Usuario de la sesion actual (guardado al iniciar sesion).
   const usuario = getUsuario();
+
+  // Sesion unica: chequeamos contra el backend si nuestra sesion sigue activa.
+  // Si alguien inicio sesion con la misma cuenta en otro lado, /auth/me devuelve
+  // 401 y cerramos sesion aca. Se revisa al entrar y cada 45 segundos.
+  useEffect(() => {
+    let cancelado = false;
+    async function verificarSesion() {
+      try {
+        const res = await apiFetch("/auth/me");
+        if (!cancelado && res.status === 401) {
+          toast.error("Tu sesión se cerró: se inició sesión en otro dispositivo.");
+          clearSession();
+          navigate("/login", { replace: true });
+        }
+      } catch {
+        // error de red: no hacemos nada (no cerramos por una caida temporal)
+      }
+    }
+    verificarSesion();
+    const t = setInterval(verificarSesion, 45000);
+    return () => { cancelado = true; clearInterval(t); };
+  }, [navigate]);
 
   function handleLogout() {
     clearSession();

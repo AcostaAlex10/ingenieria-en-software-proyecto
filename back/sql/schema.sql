@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS usuario (
   contrasena     VARCHAR(255) NOT NULL,
   rol            ENUM('PersonalAdministrativo','PersonalTecnico','Gerente','AdministradorSistema') NOT NULL,
   activo         TINYINT(1) NOT NULL DEFAULT 1,
+  -- Identificador de la sesion activa: cada login lo regenera, invalidando la
+  -- sesion anterior (un usuario no puede estar logueado en dos lados a la vez).
+  sesion_token   VARCHAR(64) NULL,
   fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -61,11 +61,18 @@ final class AuthController
             return;
         }
 
+        // Sesion unica: generamos un id de sesion nuevo y lo guardamos. Esto
+        // invalida cualquier sesion anterior del usuario (el ultimo login gana).
+        $sid = bin2hex(random_bytes(16));
+        $upd = $this->db->prepare('UPDATE usuario SET sesion_token = ? WHERE id_usuario = ?');
+        $upd->execute([$sid, (int) $usuario['id_usuario']]);
+
         $token = Jwt::generar(
             [
                 'id_usuario' => (int) $usuario['id_usuario'],
                 'email' => $usuario['email'],
                 'rol' => $usuario['rol'],
+                'sid' => $sid,
             ],
             $this->jwtSecreto,
             $this->jwtSegundosValidez
@@ -139,6 +146,17 @@ final class AuthController
     /** @param array<string, mixed> $solicitante */
     public function yo(array $solicitante): void
     {
+        // Sesion unica: el id de sesion del token debe coincidir con el ultimo
+        // guardado en la base. Si no, hubo un login mas nuevo en otro lado.
+        $stmt = $this->db->prepare('SELECT sesion_token FROM usuario WHERE id_usuario = ?');
+        $stmt->execute([(int) ($solicitante['id_usuario'] ?? 0)]);
+        $fila = $stmt->fetch();
+
+        if ($fila === false || ($solicitante['sid'] ?? null) !== $fila['sesion_token']) {
+            $this->json(401, ['error' => 'Tu sesión se cerró: se inició sesión en otro dispositivo']);
+            return;
+        }
+
         $this->json(200, ['usuario' => $solicitante]);
     }
 
