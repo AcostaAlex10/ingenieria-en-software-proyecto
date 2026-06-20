@@ -159,7 +159,8 @@ export function AvanceMensualChart() {
   );
 }
 
-export function PresupuestoChart() {
+export function PresupuestoChart({ data }: { data?: typeof presupuestoData } = {}) {
+  const datos = data ?? presupuestoData;
   return (
     <Card>
       <CardHeader>
@@ -168,7 +169,7 @@ export function PresupuestoChart() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={presupuestoData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barGap={2}>
+          <BarChart data={datos} margin={{ top: 10, right: 10, left: -10, bottom: 0 }} barGap={2}>
             {chartProps.cartesianGrid}
             <XAxis dataKey="nombre" {...chartProps.xAxisProps} />
             <YAxis {...chartProps.yAxisProps} tickFormatter={v => `$${v}M`} />
@@ -183,18 +184,21 @@ export function PresupuestoChart() {
   );
 }
 
-export function DistribucionProyectosChart() {
+export function DistribucionProyectosChart(
+  { data, descripcion }: { data?: typeof distribucionProyectos; descripcion?: string } = {}
+) {
+  const datos = (data && data.length > 0) ? data : distribucionProyectos;
   return (
     <Card>
       <CardHeader>
         <CardTitle>Distribución de Proyectos</CardTitle>
-        <CardDescription>Estado actual — 14 obras registradas</CardDescription>
+        <CardDescription>{descripcion ?? "Estado actual — 14 obras registradas"}</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={240}>
           <PieChart>
             <Pie
-              data={distribucionProyectos}
+              data={datos}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -205,7 +209,7 @@ export function DistribucionProyectosChart() {
               strokeWidth={2}
               stroke={C.bg}
             >
-              {distribucionProyectos.map((entry, index) => (
+              {datos.map((entry, index) => (
                 <Cell key={index} fill={entry.color} />
               ))}
             </Pie>
