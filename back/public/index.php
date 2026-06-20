@@ -16,6 +16,11 @@ require_once __DIR__ . '/../src/AvanceController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
+// El servidor (ej. Render) suele correr en UTC. Fijamos la zona horaria local
+// para que las validaciones de fecha (ej. "no anterior a hoy") usen la fecha
+// correcta del usuario y no la de UTC.
+date_default_timezone_set('America/Argentina/Buenos_Aires');
+
 Cors::enviarHeaders();
 
 // Bajo el servidor embebido de PHP (php -S, mono-hilo) cerramos la conexion

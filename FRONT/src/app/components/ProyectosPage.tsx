@@ -16,8 +16,12 @@ import {
 
 const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "" };
 
-// Fecha de hoy (YYYY-MM-DD) para no permitir fechas de inicio en el pasado.
-const HOY = new Date().toISOString().slice(0, 10);
+// Fecha de hoy (YYYY-MM-DD) en la zona horaria LOCAL del usuario (no UTC),
+// para no permitir fechas de inicio en el pasado.
+const HOY = (() => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+})();
 
 function estadoBadge(estado: string) {
   switch (estado) {
