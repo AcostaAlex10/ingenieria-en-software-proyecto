@@ -26,12 +26,19 @@ final class ProyectoController
     {
     }
 
-    public function listar(?string $busqueda): void
+    public function listar(?string $busqueda, ?string $rol = null): void
     {
-        $this->responderJson(200, $this->repositorio->listar($busqueda));
+        $proyectos = $this->repositorio->listar($busqueda);
+
+        // RF20: el Personal Tecnico (obra) no debe ver costos/presupuestos.
+        if ($this->debeOcultarCostos($rol)) {
+            $proyectos = array_map([self::class, 'sinCostos'], $proyectos);
+        }
+
+        $this->responderJson(200, $proyectos);
     }
 
-    public function mostrar(string $id): void
+    public function mostrar(string $id, ?string $rol = null): void
     {
         $proyecto = $this->repositorio->buscarPorId($id);
 
@@ -40,7 +47,29 @@ final class ProyectoController
             return;
         }
 
+        // RF20: ocultar el presupuesto al Personal Tecnico.
+        if ($this->debeOcultarCostos($rol)) {
+            $proyecto = self::sinCostos($proyecto);
+        }
+
         $this->responderJson(200, $proyecto);
+    }
+
+    /** RF20: solo el Personal Tecnico tiene oculta la informacion de costos. */
+    private function debeOcultarCostos(?string $rol): bool
+    {
+        return $rol === 'PersonalTecnico';
+    }
+
+    /**
+     * Quita los campos sensibles de costo de un proyecto (RF20).
+     * @param array<string, mixed> $proyecto
+     * @return array<string, mixed>
+     */
+    private static function sinCostos(array $proyecto): array
+    {
+        unset($proyecto['presupuesto']);
+        return $proyecto;
     }
 
     /** @param array<string, mixed> $datos */

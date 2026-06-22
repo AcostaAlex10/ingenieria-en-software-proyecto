@@ -42,6 +42,10 @@ header('Content-Type: application/json; charset=utf-8');
 $jwtSecreto = Env::get('JWT_SECRET', 'cambiar_esta_clave');
 $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 
+// Grupos de roles autorizados (RF19). El AdministradorSistema es superusuario.
+const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra y planificacion
+const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar/editar/eliminar avance fisico
+
 $db = Database::conexion();
 
 $controlador = new ProyectoController(new MySqlProyectoRepository($db));
@@ -107,14 +111,16 @@ if ($recurso === 'health') {
 //  Planificacion y Avances:  /planificacion/...
 // ============================================================
 if ($recurso === 'planificacion') {
+    $usuario = exigirAutenticacion($jwtSecreto);
+
     // /planificacion/avance/{id}  -> un avance puntual
     if (($segmentos[1] ?? null) === 'avance') {
         $idAvance = $segmentos[2] ?? null;
         if ($idAvance === null) { responder(404, ['error' => 'Falta el id del avance']); exit; }
         switch ($metodoHttp) {
             case 'GET':    $avance->mostrar($idAvance); break;
-            case 'PUT':    $avance->actualizar($idAvance, leerCuerpoJson()); break;
-            case 'DELETE': $avance->eliminar($idAvance); break;
+            case 'PUT':    exigirRol($usuario, ROLES_AVANCE); $avance->actualizar($idAvance, leerCuerpoJson()); break;
+            case 'DELETE': exigirRol($usuario, ROLES_AVANCE); $avance->eliminar($idAvance); break;
             default:       responder(405, ['error' => 'Metodo no permitido']);
         }
         exit;
@@ -130,7 +136,7 @@ if ($recurso === 'planificacion') {
         }
         switch ($metodoHttp) {
             case 'GET':  $avance->listarPorPlan($planId); break;
-            case 'POST': $avance->crear($planId, leerCuerpoJson()); break;
+            case 'POST': exigirRol($usuario, ROLES_AVANCE); $avance->crear($planId, leerCuerpoJson()); break;
             default:     responder(405, ['error' => 'Metodo no permitido']);
         }
         exit;
@@ -140,8 +146,8 @@ if ($recurso === 'planificacion') {
     $idPlan = $segmentos[1] ?? null;
     if ($idPlan === null) { responder(404, ['error' => 'Falta el id de planificacion']); exit; }
     switch ($metodoHttp) {
-        case 'PUT':    $planificacion->actualizar($idPlan, leerCuerpoJson()); break;
-        case 'DELETE': $planificacion->eliminar($idPlan); break;
+        case 'PUT':    exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->actualizar($idPlan, leerCuerpoJson()); break;
+        case 'DELETE': exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->eliminar($idPlan); break;
         default:       responder(405, ['error' => 'Metodo no permitido']);
     }
     exit;
@@ -151,24 +157,25 @@ if ($recurso === 'planificacion') {
 //  Proyectos:  /proyectos  y  /proyectos/{id}/planificacion
 // ============================================================
 if ($recurso === 'proyectos') {
+    $usuario = exigirAutenticacion($jwtSecreto);
     $id = $segmentos[1] ?? null;
 
     // Sub-recurso: /proyectos/{id}/planificacion
     if (($segmentos[2] ?? null) === 'planificacion') {
         switch ($metodoHttp) {
             case 'GET':  $planificacion->obtenerPorProyecto($id); break;
-            case 'POST': $planificacion->crear($id, leerCuerpoJson()); break;
+            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->crear($id, leerCuerpoJson()); break;
             default:     responder(405, ['error' => 'Metodo no permitido']);
         }
         exit;
     }
 
     switch (true) {
-        case $metodoHttp === 'GET' && $id === null:    $controlador->listar($_GET['q'] ?? null); break;
-        case $metodoHttp === 'GET' && $id !== null:    $controlador->mostrar($id); break;
-        case $metodoHttp === 'POST' && $id === null:   $controlador->registrar(leerCuerpoJson()); break;
-        case $metodoHttp === 'PUT' && $id !== null:    $controlador->modificar($id, leerCuerpoJson()); break;
-        case $metodoHttp === 'DELETE' && $id !== null: $controlador->eliminar($id); break;
+        case $metodoHttp === 'GET' && $id === null:    $controlador->listar($_GET['q'] ?? null, $usuario['rol'] ?? null); break;
+        case $metodoHttp === 'GET' && $id !== null:    $controlador->mostrar($id, $usuario['rol'] ?? null); break;
+        case $metodoHttp === 'POST' && $id === null:   exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->registrar(leerCuerpoJson()); break;
+        case $metodoHttp === 'PUT' && $id !== null:    exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->modificar($id, leerCuerpoJson()); break;
+        case $metodoHttp === 'DELETE' && $id !== null: exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->eliminar($id); break;
         default: responder(405, ['error' => 'Metodo no permitido para esta ruta']);
     }
     exit;
@@ -191,4 +198,28 @@ function responder(int $codigo, mixed $cuerpo): void
 function noAutenticado(): void
 {
     responder(401, ['error' => 'Falta el token de autenticacion']);
+}
+/**
+ * Exige un token valido. Si no lo hay, corta con 401. Devuelve el payload
+ * del usuario (id_usuario, email, rol) para usarlo en las guardas de rol.
+ * @return array<string, mixed>
+ */
+function exigirAutenticacion(string $secreto): array
+{
+    $usuario = AuthMiddleware::usuarioAutenticado($secreto);
+    if ($usuario === null) { noAutenticado(); exit; }
+    return $usuario;
+}
+/**
+ * Exige que el rol del usuario este dentro de los permitidos (RF19).
+ * Si no, corta con 403.
+ * @param array<string, mixed> $usuario
+ * @param array<int, string> $rolesPermitidos
+ */
+function exigirRol(array $usuario, array $rolesPermitidos): void
+{
+    if (!in_array($usuario['rol'] ?? '', $rolesPermitidos, true)) {
+        responder(403, ['error' => 'No tenés permisos para esta acción']);
+        exit;
+    }
 }

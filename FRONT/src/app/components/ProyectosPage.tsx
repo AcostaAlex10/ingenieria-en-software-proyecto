@@ -13,6 +13,7 @@ import {
   listarProyectos, crearProyecto, actualizarProyecto, eliminarProyecto,
   type Proyecto, type ProyectoInput,
 } from "../api/proyectos";
+import { puedeGestionarObras, puedeVerCostos } from "../auth/permisos";
 
 const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "" };
 
@@ -40,6 +41,10 @@ export default function ProyectosPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [form, setForm] = useState(FORM_VACIO);
+
+  // Permisos del usuario logueado (RF19/RF20).
+  const gestiona = puedeGestionarObras();
+  const verCostos = puedeVerCostos();
 
   async function cargar() {
     setLoading(true);
@@ -112,9 +117,11 @@ export default function ProyectosPage() {
           <h2 className="text-3xl font-bold text-foreground">Gestión de Proyectos</h2>
           <p className="text-muted-foreground mt-2">Registrar, modificar y organizar proyectos de obra</p>
         </div>
-        <Button className="gap-2" onClick={abrirNuevo}>
-          <Plus className="w-4 h-4" /> Nuevo Proyecto
-        </Button>
+        {gestiona && (
+          <Button className="gap-2" onClick={abrirNuevo}>
+            <Plus className="w-4 h-4" /> Nuevo Proyecto
+          </Button>
+        )}
       </div>
 
       {/* Buscador */}
@@ -143,14 +150,16 @@ export default function ProyectosPage() {
                   <CardTitle>{p.nombre}</CardTitle>
                   <CardDescription className="mt-2">{p.tipo}</CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => abrirEdicion(p)} title="Editar">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => borrar(p.id)} title="Eliminar">
-                    <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
-                  </Button>
-                </div>
+                {gestiona && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => abrirEdicion(p)} title="Editar">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => borrar(p.id)} title="Eliminar">
+                      <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -173,10 +182,14 @@ export default function ProyectosPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Presupuesto: </span>
-                  <span className="font-semibold">${p.presupuesto.toLocaleString("es-AR")}</span>
-                </div>
+                {verCostos && p.presupuesto != null ? (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Presupuesto: </span>
+                    <span className="font-semibold">${p.presupuesto.toLocaleString("es-AR")}</span>
+                  </div>
+                ) : (
+                  <span />
+                )}
                 {estadoBadge(p.estado)}
               </div>
               <Button variant="outline" className="w-full gap-2" onClick={() => navigate(`/proyectos/${p.id}`)}>

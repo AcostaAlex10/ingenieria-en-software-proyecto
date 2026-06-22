@@ -13,12 +13,17 @@ import {
   listarAvances, resumenAvances, crearAvance,
   type Proyecto, type Planificacion, type Avance, type Resumen,
 } from "../api/proyectos";
+import { puedeGestionarObras, puedeRegistrarAvance } from "../auth/permisos";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  // Permisos (RF19): quién puede planificar y quién puede registrar avances.
+  const gestiona = puedeGestionarObras();
+  const registraAvance = puedeRegistrarAvance();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [plan, setPlan] = useState<Planificacion | null>(null);
@@ -122,9 +127,16 @@ export default function ProyectoDetallePage() {
         <Card>
           <CardHeader>
             <CardTitle>Planificación de la obra</CardTitle>
-            <CardDescription>Esta obra todavía no tiene planificación. Cargá el avance esperado total.</CardDescription>
+            <CardDescription>
+              {gestiona
+                ? "Esta obra todavía no tiene planificación. Cargá el avance esperado total."
+                : "Esta obra todavía no tiene planificación cargada."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            {!gestiona ? (
+              <p className="text-muted-foreground text-sm">Solo el personal administrativo puede cargar la planificación.</p>
+            ) : (
             <form onSubmit={guardarPlan} className="flex flex-wrap items-end gap-4">
               <div className="space-y-2">
                 <Label htmlFor="aet">Avance esperado total (%)</Label>
@@ -139,6 +151,7 @@ export default function ProyectoDetallePage() {
               </div>
               <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Crear planificación</Button>
             </form>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -159,7 +172,8 @@ export default function ProyectoDetallePage() {
             </Card>
           )}
 
-          {/* Cargar avance */}
+          {/* Cargar avance (solo el encargado de obra / Personal Técnico) */}
+          {registraAvance && (
           <Card>
             <CardHeader><CardTitle>Registrar avance físico</CardTitle></CardHeader>
             <CardContent>
@@ -189,6 +203,7 @@ export default function ProyectoDetallePage() {
               </form>
             </CardContent>
           </Card>
+          )}
 
           {/* Historial de avances */}
           <Card>

@@ -5,6 +5,7 @@ import {
 import { Link } from "react-router";
 import { DistribucionProyectosChart, PresupuestoChart } from "./ChartsPanel";
 import { listarProyectos, type Proyecto } from "../api/proyectos";
+import { puedeVerCostos } from "../auth/permisos";
 
 const modules = [
   { title: "Proyectos", icon: FolderKanban, link: "/proyectos", accent: "#3b82f6" },
@@ -65,6 +66,9 @@ export default function Dashboard() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // RF20: el Personal Técnico no ve costos/presupuestos.
+  const verCostos = puedeVerCostos();
+
   useEffect(() => {
     listarProyectos().then(setProyectos).catch(() => {}).finally(() => setLoading(false));
   }, []);
@@ -100,20 +104,22 @@ export default function Dashboard() {
       </div>
 
       {/* KPIs reales */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 ${verCostos ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-4`}>
         <StatCard label="Proyectos" value={String(total)} sub="obras registradas" icon={FolderKanban} accent="#3b82f6" />
         <StatCard label="En Ejecución" value={String(enEjecucion)} sub="obras activas" icon={Activity} accent="#22c55e" />
         <StatCard label="Avance Promedio" value={`${avancePromedio}%`} sub="de las obras" icon={TrendingUp} accent="#e8981e" />
-        <StatCard label="Presupuesto Total" value={pesos(presupuestoTotal)} sub="suma de obras" icon={Wallet} accent="#a855f7" />
+        {verCostos && (
+          <StatCard label="Presupuesto Total" value={pesos(presupuestoTotal)} sub="suma de obras" icon={Wallet} accent="#a855f7" />
+        )}
       </div>
 
       {loading && <div style={{ textAlign: "center", color: "var(--muted-foreground)", padding: "12px" }}>Cargando datos...</div>}
 
       {/* Graficos con datos reales */}
       {total > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${verCostos ? "lg:grid-cols-2" : ""} gap-4`}>
           <DistribucionProyectosChart data={distribucion} descripcion={`Estado actual — ${total} obra${total === 1 ? "" : "s"} registrada${total === 1 ? "" : "s"}`} />
-          <PresupuestoChart data={presupuestoChart} />
+          {verCostos && <PresupuestoChart data={presupuestoChart} />}
         </div>
       )}
 
@@ -123,8 +129,8 @@ export default function Dashboard() {
           <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--foreground)" }}>Estado de Obras</span>
           <Link to="/proyectos" style={{ fontSize: "11px", color: "var(--primary)", fontWeight: 600 }}>Ver todos →</Link>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: "1fr 140px 130px 120px", padding: "8px 18px", borderBottom: "1px solid var(--border)", background: "var(--secondary)" }}>
-          {["Proyecto", "Estado", "Avance", "Presupuesto"].map((h, i) => (
+        <div className="grid" style={{ gridTemplateColumns: verCostos ? "1fr 140px 130px 120px" : "1fr 160px 160px", padding: "8px 18px", borderBottom: "1px solid var(--border)", background: "var(--secondary)" }}>
+          {(verCostos ? ["Proyecto", "Estado", "Avance", "Presupuesto"] : ["Proyecto", "Estado", "Avance"]).map((h, i) => (
             <span key={i} style={{ fontSize: "10px", fontWeight: 600, color: "var(--muted-foreground)", letterSpacing: "0.07em", textTransform: "uppercase" }}>{h}</span>
           ))}
         </div>
@@ -136,14 +142,16 @@ export default function Dashboard() {
         {proyectos.map((p, i) => {
           const info = estadoInfo(p.estado);
           return (
-            <Link key={p.id} to={`/proyectos/${p.id}`} className="grid" style={{ gridTemplateColumns: "1fr 140px 130px 120px", padding: "11px 18px", borderBottom: i < proyectos.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", textDecoration: "none" }}>
+            <Link key={p.id} to={`/proyectos/${p.id}`} className="grid" style={{ gridTemplateColumns: verCostos ? "1fr 140px 130px 120px" : "1fr 160px 160px", padding: "11px 18px", borderBottom: i < proyectos.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", textDecoration: "none" }}>
               <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--foreground)" }}>{p.nombre}</span>
               <div className="flex items-center gap-1.5">
                 <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: info.color, flexShrink: 0 }} />
                 <span style={{ fontSize: "11px", color: info.color, fontWeight: 600 }}>{info.label}</span>
               </div>
               <ProgressBar value={Math.round(p.avance || 0)} color={info.color} />
-              <span style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "'JetBrains Mono', monospace" }}>{pesos(p.presupuesto)}</span>
+              {verCostos && (
+                <span style={{ fontSize: "11px", color: "var(--muted-foreground)", fontFamily: "'JetBrains Mono', monospace" }}>{pesos(p.presupuesto)}</span>
+              )}
             </Link>
           );
         })}
