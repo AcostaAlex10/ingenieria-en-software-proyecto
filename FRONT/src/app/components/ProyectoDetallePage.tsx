@@ -7,7 +7,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
@@ -25,7 +25,7 @@ import {
   type Material, type AsignacionMaterial, type Documento, type TipoDocumento,
   type PeriodoInactividad, type ItemExcedente,
 } from "../api/proyectos";
-import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos } from "../auth/permisos";
+import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos, puedeVerCostos } from "../auth/permisos";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -55,6 +55,7 @@ export default function ProyectoDetallePage() {
   const gestiona = puedeGestionarObras();
   const registraAvance = puedeRegistrarAvance();
   const cargaDocs = puedeCargarDocumentos();
+  const verCostos = puedeVerCostos();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [plan, setPlan] = useState<Planificacion | null>(null);
@@ -363,6 +364,13 @@ export default function ProyectoDetallePage() {
           <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {proyecto.ubicacion}</div>
           <div className="flex items-center gap-2"><User className="w-4 h-4" /> {proyecto.encargado}</div>
           <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Inicio: {new Date(proyecto.fechaInicio).toLocaleDateString("es-AR")}</div>
+          {/* RF15: certificación por monto = presupuesto x % de avance (oculto al técnico, RF20) */}
+          {verCostos && proyecto.presupuesto != null && (
+            <div className="flex items-center gap-2 md:col-span-3 pt-1" style={{ color: "var(--foreground)" }}>
+              <Wallet className="w-4 h-4" /> Certificación a la fecha: <b>${Math.round((proyecto.presupuesto * proyecto.avance) / 100).toLocaleString("es-AR")}</b>
+              <span className="text-muted-foreground">({proyecto.avance}% de ${proyecto.presupuesto.toLocaleString("es-AR")})</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 

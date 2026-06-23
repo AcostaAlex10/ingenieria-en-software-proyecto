@@ -40,6 +40,7 @@ export default function ProyectosPage() {
   const [dialogAbierto, setDialogAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("");
   const [form, setForm] = useState(FORM_VACIO);
 
   // Permisos del usuario logueado (RF19/RF20).
@@ -59,9 +60,17 @@ export default function ProyectosPage() {
   useEffect(() => { cargar(); }, []);
 
   const filtrados = proyectos.filter((p) =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.ubicacion.toLowerCase().includes(busqueda.toLowerCase())
+    (p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.ubicacion.toLowerCase().includes(busqueda.toLowerCase())) &&
+    (filtroEstado === "" || p.estado === filtroEstado)  // RF18: filtrar por estado (ej. finalizadas)
   );
+  const FILTROS_ESTADO = [
+    { v: "", l: "Todas" },
+    { v: "en_ejecucion", l: "En ejecución" },
+    { v: "planificacion", l: "Planificación" },
+    { v: "pausada", l: "Pausadas" },
+    { v: "finalizada", l: "Finalizadas" },
+  ];
 
   function abrirNuevo() {
     setEditandoId(null);
@@ -135,6 +144,14 @@ export default function ProyectosPage() {
               onChange={(e) => setBusqueda(e.target.value)}
               className="flex-1"
             />
+          </div>
+          {/* RF18: filtro por estado (incluye historial de finalizadas) */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {FILTROS_ESTADO.map((f) => (
+              <Button key={f.v} size="sm" variant={filtroEstado === f.v ? "default" : "outline"} onClick={() => setFiltroEstado(f.v)}>
+                {f.l}
+              </Button>
+            ))}
           </div>
         </CardContent>
       </Card>
