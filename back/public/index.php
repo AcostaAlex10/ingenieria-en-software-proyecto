@@ -22,6 +22,7 @@ require_once __DIR__ . '/../src/ReporteController.php';
 require_once __DIR__ . '/../src/InactividadController.php';
 require_once __DIR__ . '/../src/ItemExcedenteController.php';
 require_once __DIR__ . '/../src/AnalisisController.php';
+require_once __DIR__ . '/../src/MaquinariaController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -72,6 +73,7 @@ $reporte = new ReporteController($db);
 $inactividad = new InactividadController($db);
 $itemExcedente = new ItemExcedenteController($db);
 $analisis = new AnalisisController($db);
+$maquinaria = new MaquinariaController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -167,6 +169,61 @@ if ($recurso === 'reportes') {
         case 'DELETE': exigirRol($usuario, ROLES_DOC); $reporte->eliminar($idRep); break;
         default:       responder(405, ['error' => 'Metodo no permitido']);
     }
+    exit;
+}
+
+// ============================================================
+//  Maquinaria:  /maquinaria  (RF23/RF24/RF27/RF28)
+// ============================================================
+if ($recurso === 'maquinaria') {
+    $usuario = exigirAutenticacion($jwtSecreto);
+    $seg1 = $segmentos[1] ?? null;
+    $seg2 = $segmentos[2] ?? null;
+
+    if ($seg1 === null) {
+        switch ($metodoHttp) {
+            case 'GET':  $maquinaria->listar(); break;
+            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $maquinaria->crear(leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+    if ($seg1 === 'operarios') {
+        if ($metodoHttp === 'GET') { $maquinaria->rendimientoOperarios(); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+    if ($seg1 === 'registro') {
+        if ($seg2 === null) { responder(404, ['error' => 'Falta el id del registro']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $maquinaria->eliminarRegistro($seg2); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+    if ($seg1 === 'falla') {
+        if ($seg2 === null) { responder(404, ['error' => 'Falta el id de la falla']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $maquinaria->eliminarFalla($seg2); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+    $idMaq = $seg1;
+    if ($seg2 === 'registros') {
+        switch ($metodoHttp) {
+            case 'GET':  $maquinaria->listarRegistros($idMaq); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $maquinaria->crearRegistro($idMaq, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+    if ($seg2 === 'fallas') {
+        switch ($metodoHttp) {
+            case 'GET':  $maquinaria->listarFallas($idMaq); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $maquinaria->crearFalla($idMaq, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+    if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_GESTION_OBRA); $maquinaria->eliminar($idMaq); }
+    else { responder(405, ['error' => 'Metodo no permitido']); }
     exit;
 }
 

@@ -344,3 +344,59 @@ export interface Analisis {
 export async function obtenerAnalisis(): Promise<Analisis> {
   return parse(await apiFetch(`/analisis`));
 }
+
+// ---------- Maquinaria (RF23/RF24/RF27/RF28) ----------
+export interface Maquinaria {
+  id_maquinaria: number; nombre: string; tipo: string; activa: boolean;
+  horas: number; combustible: number; produccion: number;
+  combustible_por_hora: number; produccion_por_hora: number; fallas_abiertas: number;
+}
+export interface RegistroMaquinaria {
+  id_registro: number; id_maquinaria: number; id_proyecto: number | null; fecha: string;
+  operario: string | null; horas_uso: number; combustible_consumido: number;
+  produccion_realizada: number; combustible_por_hora: number; alerta_consumo: boolean;
+}
+export interface FallaMaquinaria {
+  id_falla: number; id_maquinaria: number; fecha: string; componente: string | null;
+  descripcion: string; reemplazo: boolean; resuelto: boolean;
+}
+export interface RendimientoOperario {
+  operario: string; horas: number; produccion: number; combustible: number; produccion_por_hora: number;
+}
+
+export async function listarMaquinaria(): Promise<Maquinaria[]> {
+  return parse(await apiFetch(`/maquinaria`));
+}
+export async function crearMaquinaria(datos: { nombre: string; tipo: string }): Promise<Maquinaria> {
+  return parse(await apiFetch(`/maquinaria`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarMaquinaria(id: number): Promise<void> {
+  await parse(await apiFetch(`/maquinaria/${id}`, { method: "DELETE" }));
+}
+export async function listarRegistrosMaq(idMaq: number): Promise<RegistroMaquinaria[]> {
+  return parse(await apiFetch(`/maquinaria/${idMaq}/registros`));
+}
+export async function crearRegistroMaq(
+  idMaq: number,
+  datos: { fecha: string; operario?: string; horas_uso: number; combustible_consumido: number; produccion_realizada: number; id_proyecto?: number }
+): Promise<{ id_registro: number }> {
+  return parse(await apiFetch(`/maquinaria/${idMaq}/registros`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarRegistroMaq(id: number): Promise<void> {
+  await parse(await apiFetch(`/maquinaria/registro/${id}`, { method: "DELETE" }));
+}
+export async function listarFallasMaq(idMaq: number): Promise<FallaMaquinaria[]> {
+  return parse(await apiFetch(`/maquinaria/${idMaq}/fallas`));
+}
+export async function crearFallaMaq(
+  idMaq: number,
+  datos: { fecha: string; componente?: string; descripcion: string; reemplazo?: boolean; resuelto?: boolean }
+): Promise<{ id_falla: number }> {
+  return parse(await apiFetch(`/maquinaria/${idMaq}/fallas`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarFallaMaq(id: number): Promise<void> {
+  await parse(await apiFetch(`/maquinaria/falla/${id}`, { method: "DELETE" }));
+}
+export async function rendimientoOperarios(): Promise<RendimientoOperario[]> {
+  return parse(await apiFetch(`/maquinaria/operarios`));
+}

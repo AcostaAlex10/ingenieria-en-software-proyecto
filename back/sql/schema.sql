@@ -201,3 +201,49 @@ CREATE TABLE IF NOT EXISTS item_excedente (
   CONSTRAINT fk_item_proyecto FOREIGN KEY (id_proyecto)
     REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
 );
+
+-- ============================================================
+--  Sprint 6 (opcional) - Gestion de Maquinaria
+-- ============================================================
+
+-- Registro de equipos/maquinaria (catalogo).
+CREATE TABLE IF NOT EXISTS maquinaria (
+  id_maquinaria INT AUTO_INCREMENT PRIMARY KEY,
+  nombre        VARCHAR(120) NOT NULL,
+  tipo          VARCHAR(80) NOT NULL,
+  activa        TINYINT(1) NOT NULL DEFAULT 1
+);
+
+-- Uso diario de cada maquina (RF23): horas, combustible, produccion y
+-- operario (este ultimo permite comparar rendimiento entre operarios, RF28).
+CREATE TABLE IF NOT EXISTS registro_maquinaria (
+  id_registro           INT AUTO_INCREMENT PRIMARY KEY,
+  id_maquinaria         INT NOT NULL,
+  id_proyecto           INT NULL,
+  fecha                 DATE NOT NULL,
+  operario              VARCHAR(120) NULL,
+  horas_uso             DECIMAL(8,2) NOT NULL DEFAULT 0,
+  combustible_consumido DECIMAL(10,2) NOT NULL DEFAULT 0,
+  produccion_realizada  DECIMAL(12,2) NOT NULL DEFAULT 0,
+  CONSTRAINT fk_reg_maq FOREIGN KEY (id_maquinaria) REFERENCES maquinaria(id_maquinaria) ON DELETE CASCADE,
+  CONSTRAINT fk_reg_proy FOREIGN KEY (id_proyecto) REFERENCES proyecto(id_proyecto) ON DELETE SET NULL
+);
+
+-- Historial de fallas y reemplazos de componentes (RF27).
+CREATE TABLE IF NOT EXISTS falla_maquinaria (
+  id_falla      INT AUTO_INCREMENT PRIMARY KEY,
+  id_maquinaria INT NOT NULL,
+  fecha         DATE NOT NULL,
+  componente    VARCHAR(120) NULL,
+  descripcion   TEXT NOT NULL,
+  reemplazo     TINYINT(1) NOT NULL DEFAULT 0,
+  resuelto      TINYINT(1) NOT NULL DEFAULT 0,
+  CONSTRAINT fk_falla_maq FOREIGN KEY (id_maquinaria) REFERENCES maquinaria(id_maquinaria) ON DELETE CASCADE
+);
+
+-- Maquinaria precargada (RF: listas predefinidas). INSERT IGNORE -> idempotente.
+INSERT IGNORE INTO maquinaria (id_maquinaria, nombre, tipo) VALUES
+  (1, 'Retroexcavadora CAT 320', 'Excavación'),
+  (2, 'Cargadora frontal JCB', 'Carga'),
+  (3, 'Camión volcador Iveco', 'Transporte'),
+  (4, 'Motoniveladora John Deere', 'Nivelación');

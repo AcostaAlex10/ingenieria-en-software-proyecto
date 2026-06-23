@@ -1,378 +1,245 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
-import { Wrench, Plus, AlertCircle, Clock, Fuel } from "lucide-react";
+import { Checkbox } from "./ui/checkbox";
+import { Wrench, Plus, Trash2, AlertTriangle, Fuel, Activity, Users } from "lucide-react";
 import { toast } from "sonner";
+import {
+  listarMaquinaria, crearMaquinaria, eliminarMaquinaria,
+  listarRegistrosMaq, crearRegistroMaq, eliminarRegistroMaq,
+  listarFallasMaq, crearFallaMaq, eliminarFallaMaq, rendimientoOperarios,
+  type Maquinaria, type RegistroMaquinaria, type FallaMaquinaria, type RendimientoOperario,
+} from "../api/proyectos";
+import { puedeGestionarObras, puedeCargarDocumentos } from "../auth/permisos";
 
-interface Maquina {
-  id: string;
-  nombre: string;
-  tipo: string;
-  estado: "operativa" | "mantenimiento" | "reparacion";
-  horasUso: number;
-  proximoMantenimiento: number;
-  proyecto?: string;
-}
+const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default function MaquinariaPage() {
-  const [maquinas] = useState<Maquina[]>([
-    {
-      id: "1",
-      nombre: "Excavadora CAT 320",
-      tipo: "Excavadora",
-      estado: "operativa",
-      horasUso: 2450,
-      proximoMantenimiento: 2500,
-      proyecto: "Obra Vial Ruta 14"
-    },
-    {
-      id: "2",
-      nombre: "Mezcladora Hormigón HM-500",
-      tipo: "Mezcladora",
-      estado: "operativa",
-      horasUso: 1200,
-      proximoMantenimiento: 1500,
-      proyecto: "Edificio Residencial Los Pinos"
-    },
-    {
-      id: "3",
-      nombre: "Grúa Torre TG-200",
-      tipo: "Grúa",
-      estado: "mantenimiento",
-      horasUso: 3800,
-      proximoMantenimiento: 3600,
-      proyecto: "Edificio Residencial Los Pinos"
-    },
-    {
-      id: "4",
-      nombre: "Compactadora Vibratoria CV-100",
-      tipo: "Compactadora",
-      estado: "operativa",
-      horasUso: 890,
-      proximoMantenimiento: 1000,
-      proyecto: "Obra Vial Ruta 14"
-    },
-  ]);
+  const [maquinas, setMaquinas] = useState<Maquinaria[]>([]);
+  const [operarios, setOperarios] = useState<RendimientoOperario[]>([]);
+  const [sel, setSel] = useState<Maquinaria | null>(null);
+  const [registros, setRegistros] = useState<RegistroMaquinaria[]>([]);
+  const [fallas, setFallas] = useState<FallaMaquinaria[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [registroUso, setRegistroUso] = useState({
-    maquina: "",
-    fecha: new Date().toISOString().split('T')[0],
-    horasTrabajadas: "",
-    combustible: "",
-    produccion: ""
-  });
+  const [formMaq, setFormMaq] = useState({ nombre: "", tipo: "" });
+  const [formReg, setFormReg] = useState({ fecha: hoy(), operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
+  const [formFalla, setFormFalla] = useState({ fecha: hoy(), componente: "", descripcion: "", reemplazo: false });
 
-  const historialFallas = [
-    {
-      id: "1",
-      maquina: "Excavadora CAT 320",
-      fecha: "2026-05-15",
-      descripcion: "Falla en sistema hidráulico",
-      componente: "Bomba hidráulica",
-      accion: "Reemplazo de componente",
-      estado: "resuelta"
-    },
-    {
-      id: "2",
-      maquina: "Grúa Torre TG-200",
-      fecha: "2026-06-01",
-      descripcion: "Desgaste en cable de elevación",
-      componente: "Cable de acero",
-      accion: "Reemplazo programado",
-      estado: "en_proceso"
-    },
-  ];
+  const gestiona = puedeGestionarObras();
+  const carga = puedeCargarDocumentos();
 
-  const handleRegistrarUso = (e: React.FormEvent) => {
+  async function cargarTodo() {
+    setLoading(true);
+    try {
+      setMaquinas(await listarMaquinaria());
+      setOperarios(await rendimientoOperarios());
+    } catch {
+      toast.error("No se pudo cargar la maquinaria");
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { cargarTodo(); }, []);
+
+  async function abrir(m: Maquinaria) {
+    setSel(m);
+    try {
+      setRegistros(await listarRegistrosMaq(m.id_maquinaria));
+      setFallas(await listarFallasMaq(m.id_maquinaria));
+    } catch { /* noop */ }
+  }
+  async function recargarSel() {
+    if (!sel) return;
+    setRegistros(await listarRegistrosMaq(sel.id_maquinaria));
+    setFallas(await listarFallasMaq(sel.id_maquinaria));
+    setMaquinas(await listarMaquinaria());
+    setOperarios(await rendimientoOperarios());
+  }
+
+  async function guardarMaq(e: React.FormEvent) {
     e.preventDefault();
-    toast.success("Uso de maquinaria registrado correctamente");
-    setRegistroUso({
-      maquina: "",
-      fecha: new Date().toISOString().split('T')[0],
-      horasTrabajadas: "",
-      combustible: "",
-      produccion: ""
-    });
-  };
+    try {
+      await crearMaquinaria(formMaq);
+      toast.success("Maquinaria registrada");
+      setFormMaq({ nombre: "", tipo: "" });
+      setMaquinas(await listarMaquinaria());
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+  }
+  async function guardarReg(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sel) return;
+    try {
+      await crearRegistroMaq(sel.id_maquinaria, {
+        fecha: formReg.fecha,
+        operario: formReg.operario || undefined,
+        horas_uso: parseFloat(formReg.horas_uso) || 0,
+        combustible_consumido: parseFloat(formReg.combustible_consumido) || 0,
+        produccion_realizada: parseFloat(formReg.produccion_realizada) || 0,
+      });
+      toast.success("Uso registrado");
+      setFormReg({ fecha: hoy(), operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
+      await recargarSel();
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+  }
+  async function guardarFalla(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sel) return;
+    try {
+      await crearFallaMaq(sel.id_maquinaria, {
+        fecha: formFalla.fecha, componente: formFalla.componente || undefined,
+        descripcion: formFalla.descripcion, reemplazo: formFalla.reemplazo,
+      });
+      toast.success("Falla registrada");
+      setFormFalla({ fecha: hoy(), componente: "", descripcion: "", reemplazo: false });
+      await recargarSel();
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+  }
 
-  const getEstadoBadge = (estado: Maquina["estado"]) => {
-    const badges = {
-      operativa: <Badge className="bg-green-600">Operativa</Badge>,
-      mantenimiento: <Badge className="bg-yellow-600">Mantenimiento</Badge>,
-      reparacion: <Badge variant="destructive">En Reparación</Badge>,
-    };
-    return badges[estado];
-  };
-
-  const getMantenimientoStatus = (horasUso: number, proximoMantenimiento: number) => {
-    const diferencia = proximoMantenimiento - horasUso;
-    if (diferencia < 50) return { color: "text-red-600", bg: "bg-sseconcondaryary", label: "Urgente" };
-    if (diferencia < 200) return { color: "text-yellow-600", bg: "bg-sseccondaryndary", label: "Próximo" };
-    return { color: "text-green-600", bg: "bg-ssecocondarydary", label: "Normal" };
-  };
+  if (loading) return <div className="text-center text-muted-foreground py-12">Cargando maquinaria...</div>;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold text-foreforegroundound">Gestión de Maquinaria</h2>
-        <p className="text-muted-foremuted-foregroundound mt-2">
-          Registrar uso y mantenimiento de equipos
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><Wrench className="w-7 h-7" /> Gestión de Maquinaria</h2>
+          <p className="text-muted-foreground mt-2">Uso de equipos (RF23), fallas (RF27) y rendimiento por operario (RF28).</p>
+        </div>
       </div>
 
-      <Tabs defaultValue="registro" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="registro">Registro de Uso</TabsTrigger>
-          <TabsTrigger value="inventario">Inventario</TabsTrigger>
-          <TabsTrigger value="mantenimiento">Mantenimiento</TabsTrigger>
-        </TabsList>
+      {gestiona && (
+        <Card>
+          <CardContent className="pt-6">
+            <form onSubmit={guardarMaq} className="flex flex-wrap items-end gap-3">
+              <div className="space-y-2"><Label htmlFor="mn">Nueva máquina</Label>
+                <Input id="mn" required placeholder="Nombre" value={formMaq.nombre} onChange={(e) => setFormMaq({ ...formMaq, nombre: e.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="mt">Tipo</Label>
+                <Input id="mt" required placeholder="Ej: Excavación" value={formMaq.tipo} onChange={(e) => setFormMaq({ ...formMaq, tipo: e.target.value })} /></div>
+              <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Agregar</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Registro de Uso */}
-        <TabsContent value="registro" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Registrar Uso de Maquinaria</CardTitle>
-                <CardDescription>
-                  Registrar horas de uso, consumo de combustible y producción
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleRegistrarUso} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="maquina">Maquinaria</Label>
-                    <Select 
-                      value={registroUso.maquina} 
-                      onValueChange={(value) => setRegistroUso({...registroUso, maquina: value})}
-                      required
-                    >
-                      <SelectTrigger id="maquina">
-                        <SelectValue placeholder="Seleccionar maquinaria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {maquinas.filter(m => m.estado === "operativa").map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fecha-uso">Fecha</Label>
-                    <Input
-                      id="fecha-uso"
-                      type="date"
-                      value={registroUso.fecha}
-                      onChange={(e) => setRegistroUso({...registroUso, fecha: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="horas">Horas Trabajadas</Label>
-                    <Input
-                      id="horas"
-                      type="number"
-                      value={registroUso.horasTrabajadas}
-                      onChange={(e) => setRegistroUso({...registroUso, horasTrabajadas: e.target.value})}
-                      placeholder="0"
-                      min="0"
-                      step="0.1"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="combustible">Combustible Consumido (litros)</Label>
-                    <Input
-                      id="combustible"
-                      type="number"
-                      value={registroUso.combustible}
-                      onChange={(e) => setRegistroUso({...registroUso, combustible: e.target.value})}
-                      placeholder="0"
-                      min="0"
-                      step="0.1"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="produccion">Producción Realizada</Label>
-                    <Input
-                      id="produccion"
-                      type="number"
-                      value={registroUso.produccion}
-                      onChange={(e) => setRegistroUso({...registroUso, produccion: e.target.value})}
-                      placeholder="Ej: m³ excavados, cargas transportadas"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Registrar Uso
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {maquinas.map((m) => (
+          <Card key={m.id_maquinaria} className={sel?.id_maquinaria === m.id_maquinaria ? "border-primary" : ""}>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div><CardTitle>{m.nombre}</CardTitle><CardDescription>{m.tipo}</CardDescription></div>
+                {m.fallas_abiertas > 0 && <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> {m.fallas_abiertas} falla(s)</Badge>}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex flex-wrap gap-4 text-muted-foreground">
+                <span className="flex items-center gap-1"><Activity className="w-4 h-4" /> {m.horas} h</span>
+                <span className="flex items-center gap-1"><Fuel className="w-4 h-4" /> {m.combustible} L ({m.combustible_por_hora} L/h)</span>
+                <span>Prod.: {m.produccion} ({m.produccion_por_hora}/h)</span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => abrir(m)}>Ver uso y fallas</Button>
+                {gestiona && (
+                  <Button size="sm" variant="ghost" onClick={() => { eliminarMaquinaria(m.id_maquinaria).then(() => { setMaquinas((p) => p.filter((x) => x.id_maquinaria !== m.id_maquinaria)); if (sel?.id_maquinaria === m.id_maquinaria) setSel(null); }).catch(() => toast.error("Error")); }}>
+                    <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
                   </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {sel && (
+        <Card>
+          <CardHeader><CardTitle>{sel.nombre} — uso y fallas</CardTitle></CardHeader>
+          <CardContent className="space-y-6">
+            {/* Registro de uso (RF23) */}
+            <div className="space-y-3">
+              <h4 className="font-semibold">Registro de uso (RF23)</h4>
+              {carga && (
+                <form onSubmit={guardarReg} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                  <div className="space-y-1"><Label htmlFor="rf">Fecha</Label><Input id="rf" type="date" required value={formReg.fecha} onChange={(e) => setFormReg({ ...formReg, fecha: e.target.value })} /></div>
+                  <div className="space-y-1"><Label htmlFor="ro">Operario</Label><Input id="ro" value={formReg.operario} onChange={(e) => setFormReg({ ...formReg, operario: e.target.value })} /></div>
+                  <div className="space-y-1"><Label htmlFor="rh">Horas</Label><Input id="rh" type="number" min="0" step="0.1" value={formReg.horas_uso} onChange={(e) => setFormReg({ ...formReg, horas_uso: e.target.value })} /></div>
+                  <div className="space-y-1"><Label htmlFor="rc">Combust. (L)</Label><Input id="rc" type="number" min="0" step="0.1" value={formReg.combustible_consumido} onChange={(e) => setFormReg({ ...formReg, combustible_consumido: e.target.value })} /></div>
+                  <div className="space-y-1"><Label htmlFor="rp">Producción</Label><Input id="rp" type="number" min="0" step="0.1" value={formReg.produccion_realizada} onChange={(e) => setFormReg({ ...formReg, produccion_realizada: e.target.value })} /></div>
+                  <Button type="submit" className="gap-1"><Plus className="w-4 h-4" /> Registrar</Button>
                 </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Información del Sistema</CardTitle>
-                <CardDescription>Casos de uso relacionados</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-ssecondarycondary rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Registrar uso de maquinaria</h4>
-                  <p className="text-sm text-blue-800">
-                    Permite analizar el rendimiento operativo de cada equipo mediante el registro de horas de uso, combustible y producción.
-                  </p>
-                </div>
-                <div className="p-4 bg-ssecocondarydary rounded-lg">
-                  <h4 className="font-medium text-green-900 mb-2">Encargado de taller</h4>
-                  <p className="text-sm text-green-800">
-                    El encargado de taller registra el uso de maquinaria para analizar su rendimiento operativo.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Inventario */}
-        <TabsContent value="inventario" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventario de Maquinaria</CardTitle>
-              <CardDescription>
-                Estado y ubicación de equipos ({maquinas.length} máquinas)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {maquinas.map((maquina) => {
-                  const mantenimiento = getMantenimientoStatus(maquina.horasUso, maquina.proximoMantenimiento);
-                  return (
-                    <div key={maquina.id} className="p-4 border rounded-lg space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-foreforegroundound">{maquina.nombre}</h4>
-                            {getEstadoBadge(maquina.estado)}
-                          </div>
-                          <p className="text-sm text-muted-foremuted-foregroundound">{maquina.tipo}</p>
-                          {maquina.proyecto && (
-                            <p className="text-sm text-muted-foremuted-foregroundound mt-1">
-                              Asignada a: {maquina.proyecto}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <div className="flex items-center gap-2 text-muted-foremuted-foregroundound mb-1">
-                            <Clock className="w-4 h-4" />
-                            <span>Horas de Uso</span>
-                          </div>
-                          <p className="font-semibold text-foreforegroundound">{maquina.horasUso} hs</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 text-muted-foremuted-foregroundound mb-1">
-                            <Wrench className="w-4 h-4" />
-                            <span>Próximo Mantenimiento</span>
-                          </div>
-                          <p className="font-semibold text-foreforegroundound">{maquina.proximoMantenimiento} hs</p>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 text-muted-foremuted-foregroundound mb-1">
-                            <AlertCircle className="w-4 h-4" />
-                            <span>Estado Mantenimiento</span>
-                          </div>
-                          <Badge className={`${mantenimiento.bg} ${mantenimiento.color} border-0`}>
-                            {mantenimiento.label}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foremuted-foregroundound">Progreso hasta mantenimiento</span>
-                          <span className="font-semibold">
-                            {maquina.proximoMantenimiento - maquina.horasUso} hs restantes
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all ${
-                              (maquina.horasUso / maquina.proximoMantenimiento) > 0.9 ? 'bg-red-600' :
-                              (maquina.horasUso / maquina.proximoMantenimiento) > 0.7 ? 'bg-yellow-600' :
-                              'bg-green-600'
-                            }`}
-                            style={{ width: `${Math.min((maquina.horasUso / maquina.proximoMantenimiento) * 100, 100)}%` }}
-                          />
-                        </div>
-                      </div>
+              )}
+              {registros.length === 0 ? <p className="text-muted-foreground text-sm">Sin registros de uso.</p> : (
+                <div className="space-y-1">
+                  {registros.map((r) => (
+                    <div key={r.id_registro} className="flex items-center gap-3 border rounded-md px-3 py-2 text-sm">
+                      <span className="text-muted-foreground w-24">{new Date(r.fecha).toLocaleDateString("es-AR")}</span>
+                      <span className="w-32">{r.operario ?? "—"}</span>
+                      <span>{r.horas_uso} h</span>
+                      <span>{r.combustible_consumido} L</span>
+                      <span className="text-muted-foreground">{r.combustible_por_hora} L/h</span>
+                      {r.alerta_consumo && <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Consumo alto</Badge>}
+                      <span className="flex-1 text-right">Prod. {r.produccion_realizada}</span>
+                      {carga && <Button size="sm" variant="ghost" onClick={() => eliminarRegistroMaq(r.id_registro).then(recargarSel).catch(() => toast.error("Error"))}><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>}
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        {/* Mantenimiento */}
-        <TabsContent value="mantenimiento" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Historial de Fallas y Reemplazos</CardTitle>
-              <CardDescription>
-                Consultar problemas recurrentes y mantenimientos realizados
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {historialFallas.map((falla) => (
-                  <div key={falla.id} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold text-foreforegroundound">{falla.maquina}</h4>
-                          <Badge variant={falla.estado === "resuelta" ? "outline" : "destructive"}>
-                            {falla.estado === "resuelta" ? "Resuelta" : "En Proceso"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-card-forecard-foregroundound mb-2">{falla.descripcion}</p>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foremuted-foregroundound">Componente: </span>
-                            <span className="font-medium text-foreforegroundound">{falla.componente}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foremuted-foregroundound">Acción: </span>
-                            <span className="font-medium text-foreforegroundound">{falla.accion}</span>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foremuted-foregroundound mt-2">
-                          {new Date(falla.fecha).toLocaleDateString('es-AR')}
-                        </p>
-                      </div>
+            {/* Fallas (RF27) */}
+            <div className="space-y-3">
+              <h4 className="font-semibold">Historial de fallas (RF27)</h4>
+              {carga && (
+                <form onSubmit={guardarFalla} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                  <div className="space-y-1"><Label htmlFor="ff">Fecha</Label><Input id="ff" type="date" required value={formFalla.fecha} onChange={(e) => setFormFalla({ ...formFalla, fecha: e.target.value })} /></div>
+                  <div className="space-y-1"><Label htmlFor="fc">Componente</Label><Input id="fc" value={formFalla.componente} onChange={(e) => setFormFalla({ ...formFalla, componente: e.target.value })} /></div>
+                  <div className="space-y-1 md:col-span-2"><Label htmlFor="fd">Descripción</Label><Textarea id="fd" required rows={1} value={formFalla.descripcion} onChange={(e) => setFormFalla({ ...formFalla, descripcion: e.target.value })} /></div>
+                  <label className="flex items-center gap-2 text-sm"><Checkbox checked={formFalla.reemplazo} onCheckedChange={(v) => setFormFalla({ ...formFalla, reemplazo: !!v })} /> Hubo reemplazo</label>
+                  <Button type="submit" className="gap-1"><Plus className="w-4 h-4" /> Registrar falla</Button>
+                </form>
+              )}
+              {fallas.length === 0 ? <p className="text-muted-foreground text-sm">Sin fallas registradas.</p> : (
+                <div className="space-y-1">
+                  {fallas.map((f) => (
+                    <div key={f.id_falla} className="flex items-center gap-3 border rounded-md px-3 py-2 text-sm">
+                      <span className="text-muted-foreground w-24">{new Date(f.fecha).toLocaleDateString("es-AR")}</span>
+                      {f.componente && <Badge variant="secondary">{f.componente}</Badge>}
+                      <span className="flex-1">{f.descripcion}</span>
+                      {f.reemplazo && <Badge variant="outline">Reemplazo</Badge>}
+                      {carga && <Button size="sm" variant="ghost" onClick={() => eliminarFallaMaq(f.id_falla).then(recargarSel).catch(() => toast.error("Error"))}><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                <Button className="w-full gap-2" variant="outline">
-                  <Plus className="w-4 h-4" />
-                  Registrar Falla o Mantenimiento
-                </Button>
+      {/* Rendimiento por operario (RF28) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Rendimiento por operario (RF28)</CardTitle>
+          <CardDescription>Comparativa de producción entre operarios.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {operarios.length === 0 ? <p className="text-muted-foreground text-sm">Todavía no hay datos de operarios.</p> : (
+            <div className="space-y-1">
+              <div className="grid text-xs text-muted-foreground uppercase" style={{ gridTemplateColumns: "1fr 110px 130px 130px" }}>
+                <span>Operario</span><span>Horas</span><span>Producción</span><span>Prod./hora</span>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              {operarios.map((o, i) => (
+                <div key={i} className="grid items-center text-sm border-t py-2" style={{ gridTemplateColumns: "1fr 110px 130px 130px" }}>
+                  <span className="font-medium">{o.operario}</span>
+                  <span>{o.horas} h</span>
+                  <span>{o.produccion}</span>
+                  <span style={{ fontWeight: 600 }}>{o.produccion_por_hora}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
