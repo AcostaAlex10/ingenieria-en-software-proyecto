@@ -6,16 +6,39 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
   listarAvances, resumenAvances, crearAvance,
+  listarAsistencias, crearAsistencia, eliminarAsistencia,
+  listarIncidencias, crearIncidencia, eliminarIncidencia,
   type Proyecto, type Planificacion, type Avance, type Resumen,
+  type Asistencia, type Incidencia, type EstadoAsistencia,
+  type TipoIncidencia, type GravedadIncidencia,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeRegistrarAvance } from "../auth/permisos";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
+
+// Etiquetas y colores para mostrar asistencia e incidencias.
+const ESTADO_ASIS: Record<EstadoAsistencia, { label: string; color: string }> = {
+  presente: { label: "Presente", color: "#22c55e" },
+  ausente: { label: "Ausente", color: "#ef4444" },
+  tarde: { label: "Tarde", color: "#e8981e" },
+};
+const TIPO_INC: Record<TipoIncidencia, string> = {
+  clima: "Clima",
+  falla_maquinaria: "Falla de maquinaria",
+  proveedor: "Retraso de proveedor",
+  otro: "Otro",
+};
+const GRAVEDAD_INC: Record<GravedadIncidencia, { label: string; color: string }> = {
+  baja: { label: "Baja", color: "#22c55e" },
+  media: { label: "Media", color: "#e8981e" },
+  alta: { label: "Alta", color: "#ef4444" },
+};
 
 export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -34,12 +57,25 @@ export default function ProyectoDetallePage() {
   const [formPlan, setFormPlan] = useState({ avance_esperado_total: "", fecha_carga: hoy() });
   const [formAvance, setFormAvance] = useState({ cantidad_ejecutada: "", porcentaje_avance: "", fecha: hoy(), observaciones: "" });
 
+  // Seguimiento operativo (Sprint 2): asistencia (RF06) e incidencias (RF09).
+  const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
+  const [incidencias, setIncidencias] = useState<Incidencia[]>([]);
+  const [formAsis, setFormAsis] = useState<{ trabajador: string; estado: EstadoAsistencia; fecha: string; justificacion: string }>(
+    { trabajador: "", estado: "presente", fecha: hoy(), justificacion: "" }
+  );
+  const [formInc, setFormInc] = useState<{ tipo: TipoIncidencia; gravedad: GravedadIncidencia; fecha: string; descripcion: string; dias_retraso: string }>(
+    { tipo: "clima", gravedad: "media", fecha: hoy(), descripcion: "", dias_retraso: "" }
+  );
+
   const cargar = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
       const proy = await obtenerProyecto(id);
       setProyecto(proy);
+      // Seguimiento operativo: dependen solo de la obra (no de la planificación).
+      setAsistencias(await listarAsistencias(id));
+      setIncidencias(await listarIncidencias(id));
       const planif = await obtenerPlanificacion(id);
       setPlan(planif);
       if (planif) {
@@ -87,6 +123,61 @@ export default function ProyectoDetallePage() {
       await cargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al registrar el avance");
+    }
+  }
+
+  // --- Asistencia (RF06) ---
+  async function guardarAsistencia(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await crearAsistencia(id, {
+        fecha: formAsis.fecha,
+        trabajador: formAsis.trabajador,
+        estado: formAsis.estado,
+        justificacion: formAsis.justificacion || undefined,
+      });
+      toast.success("Asistencia registrada");
+      setFormAsis({ trabajador: "", estado: "presente", fecha: hoy(), justificacion: "" });
+      setAsistencias(await listarAsistencias(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrar la asistencia");
+    }
+  }
+  async function borrarAsistencia(idA: number) {
+    try {
+      await eliminarAsistencia(idA);
+      setAsistencias((prev) => prev.filter((a) => a.id_asistencia !== idA));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
+    }
+  }
+
+  // --- Incidencias externas (RF09) ---
+  async function guardarIncidencia(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await crearIncidencia(id, {
+        fecha: formInc.fecha,
+        tipo: formInc.tipo,
+        gravedad: formInc.gravedad,
+        descripcion: formInc.descripcion,
+        dias_retraso: formInc.dias_retraso ? parseInt(formInc.dias_retraso, 10) : 0,
+      });
+      toast.success("Incidencia registrada");
+      setFormInc({ tipo: "clima", gravedad: "media", fecha: hoy(), descripcion: "", dias_retraso: "" });
+      setIncidencias(await listarIncidencias(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrar la incidencia");
+    }
+  }
+  async function borrarIncidencia(idI: number) {
+    try {
+      await eliminarIncidencia(idI);
+      setIncidencias((prev) => prev.filter((x) => x.id_incidencia !== idI));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
   }
 
@@ -227,6 +318,149 @@ export default function ProyectoDetallePage() {
           </Card>
         </>
       )}
+
+      {/* Asistencia del personal (RF06) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Asistencia del personal</CardTitle>
+          <CardDescription>Registro diario de los trabajadores presentes en la obra.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {registraAvance && (
+            <form onSubmit={guardarAsistencia} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="trab">Trabajador</Label>
+                <Input id="trab" required value={formAsis.trabajador}
+                  onChange={(e) => setFormAsis({ ...formAsis, trabajador: e.target.value })} placeholder="Nombre y apellido" />
+              </div>
+              <div className="space-y-2">
+                <Label>Estado</Label>
+                <Select value={formAsis.estado} onValueChange={(v) => setFormAsis({ ...formAsis, estado: v as EstadoAsistencia })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="presente">Presente</SelectItem>
+                    <SelectItem value="ausente">Ausente</SelectItem>
+                    <SelectItem value="tarde">Tarde</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fasis">Fecha</Label>
+                <Input id="fasis" type="date" required value={formAsis.fecha}
+                  onChange={(e) => setFormAsis({ ...formAsis, fecha: e.target.value })} />
+              </div>
+              <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Registrar</Button>
+              {formAsis.estado !== "presente" && (
+                <div className="space-y-2 md:col-span-5">
+                  <Label htmlFor="just">Justificación (opcional)</Label>
+                  <Input id="just" value={formAsis.justificacion}
+                    onChange={(e) => setFormAsis({ ...formAsis, justificacion: e.target.value })}
+                    placeholder="Motivo de la ausencia o llegada tarde" />
+                </div>
+              )}
+            </form>
+          )}
+          {asistencias.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Todavía no hay asistencias registradas.</p>
+          ) : (
+            <div className="space-y-2">
+              {asistencias.map((a) => {
+                const info = ESTADO_ASIS[a.estado];
+                return (
+                  <div key={a.id_asistencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
+                    <span className="text-muted-foreground w-24">{new Date(a.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="font-medium">{a.trabajador}</span>
+                    <Badge style={{ background: info.color }}>{info.label}</Badge>
+                    <span className="text-muted-foreground flex-1 truncate">{a.justificacion ?? ""}</span>
+                    {registraAvance && (
+                      <Button size="sm" variant="ghost" onClick={() => borrarAsistencia(a.id_asistencia)} title="Eliminar">
+                        <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Incidencias externas (RF09) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><CloudRain className="w-5 h-5" /> Incidencias externas</CardTitle>
+          <CardDescription>Clima, fallas de maquinaria o retrasos de proveedores que afectan la obra.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {registraAvance && (
+            <form onSubmit={guardarIncidencia} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={formInc.tipo} onValueChange={(v) => setFormInc({ ...formInc, tipo: v as TipoIncidencia })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="clima">Clima</SelectItem>
+                    <SelectItem value="falla_maquinaria">Falla de maquinaria</SelectItem>
+                    <SelectItem value="proveedor">Retraso de proveedor</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Gravedad</Label>
+                <Select value={formInc.gravedad} onValueChange={(v) => setFormInc({ ...formInc, gravedad: v as GravedadIncidencia })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="baja">Baja</SelectItem>
+                    <SelectItem value="media">Media</SelectItem>
+                    <SelectItem value="alta">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="finc">Fecha</Label>
+                <Input id="finc" type="date" required value={formInc.fecha}
+                  onChange={(e) => setFormInc({ ...formInc, fecha: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dr">Días de retraso</Label>
+                <Input id="dr" type="number" min="0" value={formInc.dias_retraso}
+                  onChange={(e) => setFormInc({ ...formInc, dias_retraso: e.target.value })} placeholder="0" />
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <Label htmlFor="desc">Descripción</Label>
+                <Textarea id="desc" required value={formInc.descripcion}
+                  onChange={(e) => setFormInc({ ...formInc, descripcion: e.target.value })}
+                  placeholder="Detalle de la incidencia" />
+              </div>
+              <Button type="submit" className="gap-2 md:self-end"><Plus className="w-4 h-4" /> Registrar</Button>
+            </form>
+          )}
+          {incidencias.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Todavía no hay incidencias registradas.</p>
+          ) : (
+            <div className="space-y-2">
+              {incidencias.map((x) => {
+                const g = GRAVEDAD_INC[x.gravedad];
+                return (
+                  <div key={x.id_incidencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
+                    <span className="text-muted-foreground w-24">{new Date(x.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="font-medium">{TIPO_INC[x.tipo]}</span>
+                    <Badge style={{ background: g.color }}>{g.label}</Badge>
+                    <span className="text-muted-foreground flex-1 truncate">{x.descripcion}</span>
+                    {x.dias_retraso > 0 && <span className="text-xs text-muted-foreground whitespace-nowrap">+{x.dias_retraso} d</span>}
+                    {registraAvance && (
+                      <Button size="sm" variant="ghost" onClick={() => borrarIncidencia(x.id_incidencia)} title="Eliminar">
+                        <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

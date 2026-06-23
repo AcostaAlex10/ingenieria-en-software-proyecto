@@ -41,6 +41,29 @@ export interface Resumen {
   ultimo_registro: string | null;
 }
 
+// Seguimiento operativo (Sprint 2)
+export type EstadoAsistencia = "presente" | "ausente" | "tarde";
+export interface Asistencia {
+  id_asistencia: number;
+  id_proyecto: number;
+  fecha: string;
+  trabajador: string;
+  estado: EstadoAsistencia;
+  justificacion: string | null;
+}
+
+export type TipoIncidencia = "clima" | "falla_maquinaria" | "proveedor" | "otro";
+export type GravedadIncidencia = "baja" | "media" | "alta";
+export interface Incidencia {
+  id_incidencia: number;
+  id_proyecto: number;
+  fecha: string;
+  tipo: TipoIncidencia;
+  gravedad: GravedadIncidencia;
+  descripcion: string;
+  dias_retraso: number;
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -101,4 +124,32 @@ export async function crearAvance(
   datos: { cantidad_ejecutada: number; porcentaje_avance: number; fecha: string; observaciones?: string }
 ): Promise<Avance> {
   return parse(await apiFetch(`/planificacion/${idPlan}/avances`, { method: "POST", body: JSON.stringify(datos) }));
+}
+
+// ---------- Asistencia del personal (RF06) ----------
+export async function listarAsistencias(idProyecto: string): Promise<Asistencia[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/asistencias`));
+}
+export async function crearAsistencia(
+  idProyecto: string,
+  datos: { fecha: string; trabajador: string; estado: EstadoAsistencia; justificacion?: string }
+): Promise<Asistencia> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/asistencias`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarAsistencia(idAsistencia: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/asistencia/${idAsistencia}`, { method: "DELETE" }));
+}
+
+// ---------- Incidencias externas (RF09) ----------
+export async function listarIncidencias(idProyecto: string): Promise<Incidencia[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/incidencias`));
+}
+export async function crearIncidencia(
+  idProyecto: string,
+  datos: { fecha: string; tipo: TipoIncidencia; gravedad: GravedadIncidencia; descripcion: string; dias_retraso?: number }
+): Promise<Incidencia> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/incidencias`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarIncidencia(idIncidencia: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/incidencia/${idIncidencia}`, { method: "DELETE" }));
 }

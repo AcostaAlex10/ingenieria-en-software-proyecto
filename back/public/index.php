@@ -13,6 +13,8 @@ require_once __DIR__ . '/../src/MySqlProyectoRepository.php';
 require_once __DIR__ . '/../src/ProyectoController.php';
 require_once __DIR__ . '/../src/PlanificacionController.php';
 require_once __DIR__ . '/../src/AvanceController.php';
+require_once __DIR__ . '/../src/AsistenciaController.php';
+require_once __DIR__ . '/../src/IncidenciaController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -52,6 +54,8 @@ $controlador = new ProyectoController(new MySqlProyectoRepository($db));
 $auth = new AuthController($db, $jwtSecreto, $jwtSegundos);
 $planificacion = new PlanificacionController($db);
 $avance = new AvanceController($db);
+$asistencia = new AsistenciaController($db);
+$incidencia = new IncidenciaController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -159,6 +163,44 @@ if ($recurso === 'planificacion') {
 if ($recurso === 'proyectos') {
     $usuario = exigirAutenticacion($jwtSecreto);
     $id = $segmentos[1] ?? null;
+
+    // /proyectos/asistencia/{id}  -> DELETE de un registro de asistencia
+    if ($id === 'asistencia') {
+        $aid = $segmentos[2] ?? null;
+        if ($aid === null) { responder(404, ['error' => 'Falta el id de asistencia']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $asistencia->eliminar($aid); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // /proyectos/incidencia/{id}  -> DELETE de una incidencia
+    if ($id === 'incidencia') {
+        $iid = $segmentos[2] ?? null;
+        if ($iid === null) { responder(404, ['error' => 'Falta el id de incidencia']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $incidencia->eliminar($iid); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/asistencias  (RF06)
+    if (($segmentos[2] ?? null) === 'asistencias') {
+        switch ($metodoHttp) {
+            case 'GET':  $asistencia->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_AVANCE); $asistencia->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/incidencias  (RF09)
+    if (($segmentos[2] ?? null) === 'incidencias') {
+        switch ($metodoHttp) {
+            case 'GET':  $incidencia->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_AVANCE); $incidencia->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
 
     // Sub-recurso: /proyectos/{id}/planificacion
     if (($segmentos[2] ?? null) === 'planificacion') {

@@ -59,3 +59,37 @@ CREATE TABLE IF NOT EXISTS avance_fisico (
   CONSTRAINT fk_avance_planificacion FOREIGN KEY (id_planificacion)
     REFERENCES planificacion(id_planificacion) ON DELETE CASCADE
 );
+
+-- ============================================================
+--  Sprint 2 - Seguimiento Operativo
+-- ============================================================
+
+-- Asistencia diaria del personal en obra (RF06). Una fila por trabajador
+-- y por jornada. `justificacion` permite registrar el motivo de una
+-- inasistencia o llegada tarde (RF08).
+CREATE TABLE IF NOT EXISTS asistencia (
+  id_asistencia INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto   INT NOT NULL,
+  fecha         DATE NOT NULL,
+  trabajador    VARCHAR(150) NOT NULL,
+  estado        ENUM('presente','ausente','tarde') NOT NULL DEFAULT 'presente',
+  justificacion VARCHAR(255) NULL,
+  CONSTRAINT fk_asistencia_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);
+
+-- Incidencias externas que pueden justificar retrasos o extensiones de
+-- plazo (RF09): clima, fallas de maquinaria, retrasos de proveedores, etc.
+-- `gravedad` clasifica la incidencia (RF26) y `dias_retraso` documenta el
+-- impacto en el cronograma (RF08).
+CREATE TABLE IF NOT EXISTS incidencia (
+  id_incidencia INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto   INT NOT NULL,
+  fecha         DATE NOT NULL,
+  tipo          ENUM('clima','falla_maquinaria','proveedor','otro') NOT NULL DEFAULT 'otro',
+  gravedad      ENUM('baja','media','alta') NOT NULL DEFAULT 'media',
+  descripcion   TEXT NOT NULL,
+  dias_retraso  INT NOT NULL DEFAULT 0,
+  CONSTRAINT fk_incidencia_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);
