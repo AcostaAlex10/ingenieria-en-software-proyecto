@@ -1,211 +1,288 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
-import { FileText, Download, Eye, Edit, Check, X, BarChart3 } from "lucide-react";
-import { AvanceMensualChart, PresupuestoChart, DesviacionAvanceChart, ConsumoMaterialesChart } from "./ChartsPanel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
+import { FileText, Plus, Send, Check, X, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  listarReportes, crearReporte, editarReporte, enviarReporte,
+  aprobarReporte, rechazarReporte, eliminarReporte,
+  listarProyectos,
+  type Reporte, type EstadoReporte, type Proyecto,
+} from "../api/proyectos";
+import { puedeCargarDocumentos, puedeAprobarReportes } from "../auth/permisos";
 
-interface Reporte {
-  id: string;
-  proyecto: string;
-  fecha: string;
-  tipo: string;
-  estado: "pendiente" | "revision" | "aprobado" | "rechazado";
-  creador: string;
-}
+const ESTADOS: Record<EstadoReporte, { label: string; color: string }> = {
+  borrador: { label: "Borrador", color: "#64748b" },
+  en_revision: { label: "En revisión", color: "#e8981e" },
+  aprobado: { label: "Aprobado", color: "#22c55e" },
+  rechazado: { label: "Rechazado", color: "#ef4444" },
+};
+
+const FILTROS: { valor: string; label: string }[] = [
+  { valor: "", label: "Todos" },
+  { valor: "en_revision", label: "En revisión" },
+  { valor: "borrador", label: "Borradores" },
+  { valor: "aprobado", label: "Aprobados" },
+  { valor: "rechazado", label: "Rechazados" },
+];
 
 export default function ReportesPage() {
-  const reportes: Reporte[] = [
-    {
-      id: "1",
-      proyecto: "Obra Vial Ruta 14",
-      fecha: "2026-06-04",
-      tipo: "Reporte Diario",
-      estado: "pendiente",
-      creador: "Personal Técnico"
-    },
-    {
-      id: "2",
-      proyecto: "Edificio Residencial Los Pinos",
-      fecha: "2026-06-03",
-      tipo: "Reporte Semanal",
-      estado: "revision",
-      creador: "Encargado de Obra"
-    },
-    {
-      id: "3",
-      proyecto: "Puente Posadas-Encarnación",
-      fecha: "2026-06-02",
-      tipo: "Reporte Mensual",
-      estado: "aprobado",
-      creador: "Gerencia"
-    },
-  ];
+  const [reportes, setReportes] = useState<Reporte[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState("");
 
-  const informesComparativos = [
-    { id: "1", nombre: "Comparativa Avance vs Planificado - Mayo 2026", proyecto: "Todos", fecha: "2026-06-01" },
-    { id: "2", nombre: "Análisis de Costos - Primer Trimestre", proyecto: "Obra Vial Ruta 14", fecha: "2026-05-28" },
-    { id: "3", nombre: "Desempeño de Obras - Consolidado", proyecto: "Todos", fecha: "2026-05-25" },
-  ];
+  const [dialogNuevo, setDialogNuevo] = useState(false);
+  const [formNuevo, setFormNuevo] = useState({ id_proyecto: "", titulo: "", contenido: "" });
+  const [editando, setEditando] = useState<Reporte | null>(null);
+  const [formEdit, setFormEdit] = useState({ titulo: "", contenido: "" });
+  const [rechazando, setRechazando] = useState<Reporte | null>(null);
+  const [observacion, setObservacion] = useState("");
 
-  const getEstadoBadge = (estado: Reporte["estado"]) => {
-    const badges = {
-      pendiente: <Badge variant="secondary">Pendiente</Badge>,
-      revision: <Badge className="bg-yellow-600">En Revisión</Badge>,
-      aprobado: <Badge className="bg-green-600">Aprobado</Badge>,
-      rechazado: <Badge variant="destructive">Rechazado</Badge>,
-    };
-    return badges[estado];
-  };
+  const cargaReportes = puedeCargarDocumentos();
+  const aprueba = puedeAprobarReportes();
+
+  async function cargar() {
+    setLoading(true);
+    try {
+      setReportes(await listarReportes());
+    } catch {
+      toast.error("No se pudieron cargar los reportes");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    cargar();
+    listarProyectos().then(setProyectos).catch(() => {});
+  }, []);
+
+  const visibles = filtro ? reportes.filter((r) => r.estado === filtro) : reportes;
+
+  async function guardarNuevo(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await crearReporte({
+        id_proyecto: parseInt(formNuevo.id_proyecto, 10),
+        titulo: formNuevo.titulo,
+        contenido: formNuevo.contenido,
+      });
+      toast.success("Reporte creado (borrador)");
+      setDialogNuevo(false);
+      setFormNuevo({ id_proyecto: "", titulo: "", contenido: "" });
+      await cargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al crear el reporte");
+    }
+  }
+
+  async function guardarEdicion(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editando) return;
+    try {
+      await editarReporte(editando.id_reporte, formEdit);
+      toast.success("Reporte actualizado");
+      setEditando(null);
+      await cargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al editar");
+    }
+  }
+
+  async function accion(fn: () => Promise<unknown>, ok: string) {
+    try {
+      await fn();
+      toast.success(ok);
+      await cargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error en la operación");
+    }
+  }
+
+  async function confirmarRechazo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!rechazando) return;
+    try {
+      await rechazarReporte(rechazando.id_reporte, observacion);
+      toast.success("Reporte rechazado");
+      setRechazando(null);
+      setObservacion("");
+      await cargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al rechazar");
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Reportes y Control</h2>
-        <p className="text-muted-foreground mt-2">
-          Revisar, editar y aprobar reportes operativos
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><FileText className="w-7 h-7" /> Reportes y Control</h2>
+          <p className="text-muted-foreground mt-2">Carga, revisión y aprobación de reportes operativos de obra.</p>
+        </div>
+        {cargaReportes && (
+          <Button className="gap-2" onClick={() => setDialogNuevo(true)}>
+            <Plus className="w-4 h-4" /> Nuevo reporte
+          </Button>
+        )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: "Pendientes", value: reportes.filter(r => r.estado === "pendiente").length, color: "text-muted-foreground", bg: "bg-gray-50" },
-          { label: "En Revisión", value: reportes.filter(r => r.estado === "revision").length, color: "text-yellow-600", bg: "bg-secondary" },
-          { label: "Aprobados", value: reportes.filter(r => r.estado === "aprobado").length, color: "text-green-600", bg: "bg-secondary" },
-          { label: "Rechazados", value: reportes.filter(r => r.estado === "rechazado").length, color: "text-red-600", bg: "bg-secondary" },
-        ].map((stat, idx) => (
-          <Card key={idx}>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                  <p className="text-3xl font-bold text-foreground mt-2">{stat.value}</p>
-                </div>
-                <div className={`${stat.bg} p-3 rounded-lg`}>
-                  <FileText className={`w-6 h-6 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Filtros por estado */}
+      <div className="flex flex-wrap gap-2">
+        {FILTROS.map((f) => (
+          <Button key={f.valor} size="sm" variant={filtro === f.valor ? "default" : "outline"} onClick={() => setFiltro(f.valor)}>
+            {f.label}
+          </Button>
         ))}
       </div>
 
-      {/* Charts comparativos */}
-      <div>
-        <h3 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 " style={{ color: "#a855f7" }} />
-          Análisis Gráfico Comparativo
-        </h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AvanceMensualChart />
-          <DesviacionAvanceChart />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <PresupuestoChart />
-          <ConsumoMaterialesChart />
-        </div>
-      </div>
+      {loading && <div className="text-center text-muted-foreground py-12">Cargando reportes...</div>}
 
-      {/* Revisar Reportes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Revisar Reportes</CardTitle>
-          <CardDescription>
-            Validar la información cargada por el personal de obra
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {reportes.map((reporte) => (
-              <div key={reporte.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-medium text-foreground">{reporte.proyecto}</h4>
-                    {getEstadoBadge(reporte.estado)}
+      {!loading && visibles.length === 0 && (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">No hay reportes para mostrar.</CardContent></Card>
+      )}
+
+      <div className="space-y-4">
+        {visibles.map((r) => {
+          const est = ESTADOS[r.estado];
+          const editable = r.estado === "borrador" || r.estado === "rechazado";
+          return (
+            <Card key={r.id_reporte}>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg">{r.titulo}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {r.proyecto} · por {r.autor} · {new Date(r.fecha_creacion).toLocaleDateString("es-AR")}
+                    </CardDescription>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                    <span>{reporte.tipo}</span>
-                    <span>•</span>
-                    <span>{new Date(reporte.fecha).toLocaleDateString('es-AR')}</span>
-                    <span>•</span>
-                    <span>Creado por: {reporte.creador}</span>
-                  </div>
+                  <Badge style={{ background: est.color }}>{est.label}</Badge>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="ghost" title="Ver reporte">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  {reporte.estado === "pendiente" || reporte.estado === "revision" ? (
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm whitespace-pre-wrap">{r.contenido}</p>
+
+                {r.observacion_revision && (
+                  <div className="text-sm rounded-md border-l-2 px-3 py-2" style={{ borderColor: "#ef4444", background: "rgba(239,68,68,0.06)" }}>
+                    <span className="font-semibold">Observación del revisor: </span>{r.observacion_revision}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {cargaReportes && editable && (
                     <>
-                      <Button size="sm" variant="ghost" title="Editar reporte">
-                        <Edit className="w-4 h-4" />
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditando(r); setFormEdit({ titulo: r.titulo, contenido: r.contenido }); }}>
+                        <Edit className="w-4 h-4" /> Editar
                       </Button>
-                      <Button size="sm" variant="ghost" className="" style={{ color: "#22c55e" }} title="Aprobar reporte">
-                        <Check className="w-4 h-4" />
+                      <Button size="sm" className="gap-1" onClick={() => accion(() => enviarReporte(r.id_reporte), "Enviado a revisión")}>
+                        <Send className="w-4 h-4" /> Enviar a revisión
                       </Button>
-                      <Button size="sm" variant="ghost" className="" style={{ color: "#ef4444" }} title="Rechazar">
-                        <X className="w-4 h-4" />
+                      <Button size="sm" variant="ghost" className="gap-1" onClick={() => accion(() => eliminarReporte(r.id_reporte), "Reporte eliminado")}>
+                        <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
                       </Button>
                     </>
-                  ) : (
-                    <Button size="sm" variant="ghost">
-                      <Download className="w-4 h-4" />
-                    </Button>
+                  )}
+                  {aprueba && r.estado === "en_revision" && (
+                    <>
+                      <Button size="sm" className="gap-1" style={{ background: "#22c55e" }} onClick={() => accion(() => aprobarReporte(r.id_reporte), "Reporte aprobado")}>
+                        <Check className="w-4 h-4" /> Aprobar
+                      </Button>
+                      <Button size="sm" variant="destructive" className="gap-1" onClick={() => { setRechazando(r); setObservacion(""); }}>
+                        <X className="w-4 h-4" /> Rechazar
+                      </Button>
+                    </>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-      {/* Informes Comparativos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" />
-            Generar Informes Comparativos
-          </CardTitle>
-          <CardDescription>
-            Comparar información entre avance planificado y ejecutado
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button className="gap-2">
-                <FileText className="w-4 h-4" />
-                Nuevo Informe Comparativo
-              </Button>
+      {/* Dialog: nuevo reporte */}
+      <Dialog open={dialogNuevo} onOpenChange={setDialogNuevo}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo reporte</DialogTitle>
+            <DialogDescription>Se crea como borrador. Después podés enviarlo a revisión.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={guardarNuevo} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Obra</Label>
+              <Select value={formNuevo.id_proyecto} onValueChange={(v) => setFormNuevo({ ...formNuevo, id_proyecto: v })}>
+                <SelectTrigger><SelectValue placeholder="Elegí la obra" /></SelectTrigger>
+                <SelectContent>
+                  {proyectos.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="rtit">Título</Label>
+              <Input id="rtit" required value={formNuevo.titulo} onChange={(e) => setFormNuevo({ ...formNuevo, titulo: e.target.value })} placeholder="Ej: Reporte semanal de avance" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rcont">Contenido</Label>
+              <Textarea id="rcont" required value={formNuevo.contenido} onChange={(e) => setFormNuevo({ ...formNuevo, contenido: e.target.value })} placeholder="Detalle del reporte..." rows={5} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDialogNuevo(false)}>Cancelar</Button>
+              <Button type="submit">Crear borrador</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-            <div className="border-t pt-4 space-y-3">
-              <h4 className="font-medium text-foreground">Informes Generados</h4>
-              {informesComparativos.map((informe) => (
-                <div key={informe.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                  <div className="flex-1">
-                    <h5 className="font-medium text-foreground">{informe.nombre}</h5>
-                    <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                      <span>{informe.proyecto}</span>
-                      <span>•</span>
-                      <span>{new Date(informe.fecha).toLocaleDateString('es-AR')}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+      {/* Dialog: editar reporte */}
+      <Dialog open={editando !== null} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar reporte</DialogTitle>
+            <DialogDescription>Solo se puede editar en borrador o rechazado.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={guardarEdicion} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="etit">Título</Label>
+              <Input id="etit" required value={formEdit.titulo} onChange={(e) => setFormEdit({ ...formEdit, titulo: e.target.value })} />
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <Label htmlFor="econt">Contenido</Label>
+              <Textarea id="econt" required value={formEdit.contenido} onChange={(e) => setFormEdit({ ...formEdit, contenido: e.target.value })} rows={5} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditando(null)}>Cancelar</Button>
+              <Button type="submit">Guardar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: rechazar reporte */}
+      <Dialog open={rechazando !== null} onOpenChange={(o) => !o && setRechazando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rechazar reporte</DialogTitle>
+            <DialogDescription>Indicá el motivo del rechazo. El autor podrá corregir y reenviar.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={confirmarRechazo} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="obs">Observación</Label>
+              <Textarea id="obs" required value={observacion} onChange={(e) => setObservacion(e.target.value)} placeholder="Motivo del rechazo..." rows={4} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setRechazando(null)}>Cancelar</Button>
+              <Button type="submit" variant="destructive">Rechazar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

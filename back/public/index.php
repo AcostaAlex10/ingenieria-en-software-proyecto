@@ -18,6 +18,9 @@ require_once __DIR__ . '/../src/IncidenciaController.php';
 require_once __DIR__ . '/../src/MaterialController.php';
 require_once __DIR__ . '/../src/MaterialObraController.php';
 require_once __DIR__ . '/../src/DocumentoController.php';
+require_once __DIR__ . '/../src/ReporteController.php';
+require_once __DIR__ . '/../src/InactividadController.php';
+require_once __DIR__ . '/../src/ItemExcedenteController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -50,7 +53,8 @@ $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 // Grupos de roles autorizados (RF19). El AdministradorSistema es superusuario.
 const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra, planificacion y materiales
 const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar avance, asistencia, incidencias y consumos
-const ROLES_DOC = ['AdministradorSistema', 'PersonalAdministrativo', 'PersonalTecnico']; // cargar documentacion (todos menos Gerente)
+const ROLES_DOC = ['AdministradorSistema', 'PersonalAdministrativo', 'PersonalTecnico']; // cargar documentacion, reportes, inactividad y excedentes (todos menos Gerente)
+const ROLES_REPORTE_APROBAR = ['AdministradorSistema', 'PersonalAdministrativo'];        // aprobar/rechazar reportes (RF21)
 
 $db = Database::conexion();
 
@@ -63,6 +67,9 @@ $incidencia = new IncidenciaController($db);
 $material = new MaterialController($db);
 $materialObra = new MaterialObraController($db);
 $documento = new DocumentoController($db);
+$reporte = new ReporteController($db);
+$inactividad = new InactividadController($db);
+$itemExcedente = new ItemExcedenteController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -115,6 +122,49 @@ if ($recurso === 'auth') {
 // ============================================================
 if ($recurso === 'health') {
     echo json_encode(['status' => 'ok']);
+    exit;
+}
+
+// ============================================================
+//  Reportes y aprobacion:  /reportes  (RF21/RF17)
+// ============================================================
+if ($recurso === 'reportes') {
+    $usuario = exigirAutenticacion($jwtSecreto);
+    $idRep = $segmentos[1] ?? null;
+    $accion = $segmentos[2] ?? null;
+
+    if ($idRep === null) {
+        switch ($metodoHttp) {
+            case 'GET':  $reporte->listar($_GET['estado'] ?? null); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $reporte->crear(leerCuerpoJson(), $usuario); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Acciones del flujo: enviar / aprobar / rechazar
+    if ($accion === 'enviar') {
+        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_DOC); $reporte->enviar($idRep); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+    if ($accion === 'aprobar') {
+        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_REPORTE_APROBAR); $reporte->aprobar($idRep, leerCuerpoJson()); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+    if ($accion === 'rechazar') {
+        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_REPORTE_APROBAR); $reporte->rechazar($idRep, leerCuerpoJson()); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // /reportes/{id}  -> editar / eliminar
+    switch ($metodoHttp) {
+        case 'PUT':    exigirRol($usuario, ROLES_DOC); $reporte->editar($idRep, leerCuerpoJson()); break;
+        case 'DELETE': exigirRol($usuario, ROLES_DOC); $reporte->eliminar($idRep); break;
+        default:       responder(405, ['error' => 'Metodo no permitido']);
+    }
     exit;
 }
 
@@ -237,6 +287,24 @@ if ($recurso === 'proyectos') {
         exit;
     }
 
+    // /proyectos/inactividad/{id}  -> DELETE de un periodo de inactividad
+    if ($id === 'inactividad') {
+        $idp = $segmentos[2] ?? null;
+        if ($idp === null) { responder(404, ['error' => 'Falta el id de período']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $inactividad->eliminar($idp); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // /proyectos/excedente/{id}  -> DELETE de un item excedente
+    if ($id === 'excedente') {
+        $idx = $segmentos[2] ?? null;
+        if ($idx === null) { responder(404, ['error' => 'Falta el id de ítem']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $itemExcedente->eliminar($idx); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
     // Sub-recurso: /proyectos/{id}/asistencias  (RF06)
     if (($segmentos[2] ?? null) === 'asistencias') {
         switch ($metodoHttp) {
@@ -272,6 +340,26 @@ if ($recurso === 'proyectos') {
         switch ($metodoHttp) {
             case 'GET':  $documento->listarPorProyecto($id); break;
             case 'POST': exigirRol($usuario, ROLES_DOC); $documento->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/inactividades  (RF25)
+    if (($segmentos[2] ?? null) === 'inactividades') {
+        switch ($metodoHttp) {
+            case 'GET':  $inactividad->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $inactividad->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/excedentes  (RF22)
+    if (($segmentos[2] ?? null) === 'excedentes') {
+        switch ($metodoHttp) {
+            case 'GET':  $itemExcedente->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $itemExcedente->crear($id, leerCuerpoJson()); break;
             default:     responder(405, ['error' => 'Metodo no permitido']);
         }
         exit;

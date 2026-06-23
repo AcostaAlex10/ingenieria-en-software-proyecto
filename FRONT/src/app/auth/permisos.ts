@@ -37,7 +37,12 @@ export function puedeGestionarUsuarios(rol: string = rolActual()): boolean {
   return rol === "AdministradorSistema";
 }
 
-/** Cargar documentación de obra (todos los roles operativos, menos el Gerente que solo consulta). */
+/** Cargar documentación, reportes, inactividad y excedentes (operativos, menos el Gerente). */
 export function puedeCargarDocumentos(rol: string = rolActual()): boolean {
   return rol === "AdministradorSistema" || rol === "PersonalAdministrativo" || rol === "PersonalTecnico";
+}
+
+/** Aprobar o rechazar reportes (supervisor administrativo). RF21. */
+export function puedeAprobarReportes(rol: string = rolActual()): boolean {
+  return rol === "AdministradorSistema" || rol === "PersonalAdministrativo";
 }

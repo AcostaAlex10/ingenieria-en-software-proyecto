@@ -100,6 +100,38 @@ export interface Documento {
   fecha_carga: string;
 }
 
+// Reportes, inactividad y excedentes (Sprint 4)
+export type EstadoReporte = "borrador" | "en_revision" | "aprobado" | "rechazado";
+export interface Reporte {
+  id_reporte: number;
+  id_proyecto: number;
+  proyecto: string;
+  id_usuario: number;
+  autor: string;
+  titulo: string;
+  contenido: string;
+  estado: EstadoReporte;
+  observacion_revision: string | null;
+  fecha_creacion: string;
+  fecha_revision: string | null;
+}
+export interface PeriodoInactividad {
+  id_periodo: number;
+  id_proyecto: number;
+  fecha_inicio: string;
+  fecha_fin: string | null;
+  motivo: string;
+}
+export interface ItemExcedente {
+  id_item: number;
+  id_proyecto: number;
+  descripcion: string;
+  cantidad: number | null;
+  unidad: string | null;
+  fecha: string;
+  motivo: string | null;
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -231,4 +263,56 @@ export async function crearDocumento(
 }
 export async function eliminarDocumento(idDocumento: number): Promise<void> {
   await parse(await apiFetch(`/proyectos/documento/${idDocumento}`, { method: "DELETE" }));
+}
+
+// ---------- Reportes (RF17/RF21) ----------
+export async function listarReportes(estado?: string): Promise<Reporte[]> {
+  const q = estado ? `?estado=${encodeURIComponent(estado)}` : "";
+  return parse(await apiFetch(`/reportes${q}`));
+}
+export async function crearReporte(datos: { id_proyecto: number; titulo: string; contenido: string }): Promise<Reporte> {
+  return parse(await apiFetch(`/reportes`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function editarReporte(id: number, datos: { titulo: string; contenido: string }): Promise<Reporte> {
+  return parse(await apiFetch(`/reportes/${id}`, { method: "PUT", body: JSON.stringify(datos) }));
+}
+export async function enviarReporte(id: number): Promise<Reporte> {
+  return parse(await apiFetch(`/reportes/${id}/enviar`, { method: "POST" }));
+}
+export async function aprobarReporte(id: number, observacion?: string): Promise<Reporte> {
+  return parse(await apiFetch(`/reportes/${id}/aprobar`, { method: "POST", body: JSON.stringify({ observacion }) }));
+}
+export async function rechazarReporte(id: number, observacion: string): Promise<Reporte> {
+  return parse(await apiFetch(`/reportes/${id}/rechazar`, { method: "POST", body: JSON.stringify({ observacion }) }));
+}
+export async function eliminarReporte(id: number): Promise<void> {
+  await parse(await apiFetch(`/reportes/${id}`, { method: "DELETE" }));
+}
+
+// ---------- Inactividad (RF25) ----------
+export async function listarInactividades(idProyecto: string): Promise<PeriodoInactividad[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/inactividades`));
+}
+export async function crearInactividad(
+  idProyecto: string,
+  datos: { fecha_inicio: string; fecha_fin?: string; motivo: string }
+): Promise<PeriodoInactividad> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/inactividades`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarInactividad(id: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/inactividad/${id}`, { method: "DELETE" }));
+}
+
+// ---------- Ítems excedentes (RF22) ----------
+export async function listarExcedentes(idProyecto: string): Promise<ItemExcedente[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/excedentes`));
+}
+export async function crearExcedente(
+  idProyecto: string,
+  datos: { descripcion: string; cantidad?: number; unidad?: string; fecha: string; motivo?: string }
+): Promise<ItemExcedente> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/excedentes`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarExcedente(id: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/excedente/${id}`, { method: "DELETE" }));
 }

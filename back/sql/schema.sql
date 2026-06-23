@@ -156,3 +156,48 @@ INSERT IGNORE INTO material (nombre, unidad) VALUES
   ('Hormigon elaborado', 'm3'),
   ('Madera (encofrado)', 'm2'),
   ('Pintura latex', 'litro');
+
+-- ============================================================
+--  Sprint 4 - Reportes, validacion e inactividad
+-- ============================================================
+
+-- Reportes operativos de obra con flujo de aprobacion (RF21). El revisor
+-- deja una observacion al aprobar/rechazar (RF17).
+-- Ciclo: borrador -> en_revision -> aprobado | rechazado (-> en_revision).
+CREATE TABLE IF NOT EXISTS reporte (
+  id_reporte           INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto          INT NOT NULL,
+  id_usuario           INT NOT NULL, -- autor del reporte
+  titulo               VARCHAR(150) NOT NULL,
+  contenido            TEXT NOT NULL,
+  estado               ENUM('borrador','en_revision','aprobado','rechazado') NOT NULL DEFAULT 'borrador',
+  observacion_revision VARCHAR(500) NULL,
+  fecha_creacion       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_revision       DATETIME NULL,
+  CONSTRAINT fk_reporte_proyecto FOREIGN KEY (id_proyecto) REFERENCES proyecto(id_proyecto) ON DELETE CASCADE,
+  CONSTRAINT fk_reporte_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+
+-- Periodos de inactividad de la obra con su motivo (RF25).
+CREATE TABLE IF NOT EXISTS periodo_inactividad (
+  id_periodo   INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto  INT NOT NULL,
+  fecha_inicio DATE NOT NULL,
+  fecha_fin    DATE NULL,
+  motivo       VARCHAR(255) NOT NULL,
+  CONSTRAINT fk_inactividad_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);
+
+-- Items o trabajos excedentes no contemplados en la planificacion (RF22).
+CREATE TABLE IF NOT EXISTS item_excedente (
+  id_item     INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto INT NOT NULL,
+  descripcion VARCHAR(255) NOT NULL,
+  cantidad    DECIMAL(12,2) NULL,
+  unidad      VARCHAR(30) NULL,
+  fecha       DATE NOT NULL,
+  motivo      VARCHAR(255) NULL,
+  CONSTRAINT fk_item_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);

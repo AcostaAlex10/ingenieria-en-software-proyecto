@@ -7,7 +7,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
@@ -17,10 +17,13 @@ import {
   listarCatalogoMateriales, listarMaterialesObra, asignarMaterial,
   eliminarAsignacionMaterial, crearConsumo,
   listarDocumentos, crearDocumento, eliminarDocumento,
+  listarInactividades, crearInactividad, eliminarInactividad,
+  listarExcedentes, crearExcedente, eliminarExcedente,
   type Proyecto, type Planificacion, type Avance, type Resumen,
   type Asistencia, type Incidencia, type EstadoAsistencia,
   type TipoIncidencia, type GravedadIncidencia,
   type Material, type AsignacionMaterial, type Documento, type TipoDocumento,
+  type PeriodoInactividad, type ItemExcedente,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos } from "../auth/permisos";
 
@@ -82,6 +85,12 @@ export default function ProyectoDetallePage() {
     { nombre: "", tipo: "pdf", categoria: "", url: "" }
   );
 
+  // Inactividad (RF25) y ítems excedentes (RF22).
+  const [inactividades, setInactividades] = useState<PeriodoInactividad[]>([]);
+  const [excedentes, setExcedentes] = useState<ItemExcedente[]>([]);
+  const [formInac, setFormInac] = useState({ fecha_inicio: hoy(), fecha_fin: "", motivo: "" });
+  const [formExc, setFormExc] = useState({ descripcion: "", cantidad: "", unidad: "", motivo: "" });
+
   const cargar = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -93,6 +102,8 @@ export default function ProyectoDetallePage() {
       setIncidencias(await listarIncidencias(id));
       setMateriales(await listarMaterialesObra(id));
       setDocumentos(await listarDocumentos(id));
+      setInactividades(await listarInactividades(id));
+      setExcedentes(await listarExcedentes(id));
       if (catalogo.length === 0) setCatalogo(await listarCatalogoMateriales());
       const planif = await obtenerPlanificacion(id);
       setPlan(planif);
@@ -264,6 +275,60 @@ export default function ProyectoDetallePage() {
     try {
       await eliminarDocumento(idDoc);
       setDocumentos((prev) => prev.filter((d) => d.id_documento !== idDoc));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
+    }
+  }
+
+  // --- Inactividad (RF25) ---
+  async function guardarInactividad(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await crearInactividad(id, {
+        fecha_inicio: formInac.fecha_inicio,
+        fecha_fin: formInac.fecha_fin || undefined,
+        motivo: formInac.motivo,
+      });
+      toast.success("Período de inactividad registrado");
+      setFormInac({ fecha_inicio: hoy(), fecha_fin: "", motivo: "" });
+      setInactividades(await listarInactividades(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrar el período");
+    }
+  }
+  async function borrarInactividad(idP: number) {
+    try {
+      await eliminarInactividad(idP);
+      setInactividades((prev) => prev.filter((p) => p.id_periodo !== idP));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
+    }
+  }
+
+  // --- Ítems excedentes (RF22) ---
+  async function guardarExcedente(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await crearExcedente(id, {
+        descripcion: formExc.descripcion,
+        cantidad: formExc.cantidad ? parseFloat(formExc.cantidad) : undefined,
+        unidad: formExc.unidad || undefined,
+        fecha: hoy(),
+        motivo: formExc.motivo || undefined,
+      });
+      toast.success("Ítem excedente registrado");
+      setFormExc({ descripcion: "", cantidad: "", unidad: "", motivo: "" });
+      setExcedentes(await listarExcedentes(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrar el ítem");
+    }
+  }
+  async function borrarExcedente(idX: number) {
+    try {
+      await eliminarExcedente(idX);
+      setExcedentes((prev) => prev.filter((x) => x.id_item !== idX));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
@@ -674,6 +739,98 @@ export default function ProyectoDetallePage() {
                     <Button size="sm" variant="ghost" onClick={() => borrarDoc(d.id_documento)} title="Eliminar">
                       <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
                     </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Períodos de inactividad (RF25) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Pause className="w-5 h-5" /> Períodos de inactividad</CardTitle>
+          <CardDescription>Paradas de obra con su motivo (ayudan a justificar retrasos).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {cargaDocs && (
+            <form onSubmit={guardarInactividad} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div className="space-y-2">
+                <Label htmlFor="ii">Desde</Label>
+                <Input id="ii" type="date" required value={formInac.fecha_inicio} onChange={(e) => setFormInac({ ...formInac, fecha_inicio: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="if">Hasta (opcional)</Label>
+                <Input id="if" type="date" value={formInac.fecha_fin} onChange={(e) => setFormInac({ ...formInac, fecha_fin: e.target.value })} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="im">Motivo</Label>
+                <Input id="im" required value={formInac.motivo} onChange={(e) => setFormInac({ ...formInac, motivo: e.target.value })} placeholder="Ej: Lluvias / falta de materiales" />
+              </div>
+              <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Registrar período</Button>
+            </form>
+          )}
+          {inactividades.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No hay períodos de inactividad registrados.</p>
+          ) : (
+            <div className="space-y-2">
+              {inactividades.map((p) => (
+                <div key={p.id_periodo} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
+                  <span className="text-muted-foreground">
+                    {new Date(p.fecha_inicio).toLocaleDateString("es-AR")}{p.fecha_fin ? ` → ${new Date(p.fecha_fin).toLocaleDateString("es-AR")}` : ""}
+                  </span>
+                  <span className="flex-1">{p.motivo}</span>
+                  {cargaDocs && (
+                    <Button size="sm" variant="ghost" onClick={() => borrarInactividad(p.id_periodo)} title="Eliminar"><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ítems excedentes (RF22) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Layers className="w-5 h-5" /> Ítems / trabajos excedentes</CardTitle>
+          <CardDescription>Trabajos no contemplados en la planificación inicial.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {cargaDocs && (
+            <form onSubmit={guardarExcedente} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="xd">Descripción</Label>
+                <Input id="xd" required value={formExc.descripcion} onChange={(e) => setFormExc({ ...formExc, descripcion: e.target.value })} placeholder="Ej: Refuerzo de cimientos" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="xc">Cantidad</Label>
+                <Input id="xc" type="number" min="0" step="0.01" value={formExc.cantidad} onChange={(e) => setFormExc({ ...formExc, cantidad: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="xu">Unidad</Label>
+                <Input id="xu" value={formExc.unidad} onChange={(e) => setFormExc({ ...formExc, unidad: e.target.value })} placeholder="m3, kg..." />
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <Label htmlFor="xm">Motivo (opcional)</Label>
+                <Input id="xm" value={formExc.motivo} onChange={(e) => setFormExc({ ...formExc, motivo: e.target.value })} placeholder="Por qué surgió" />
+              </div>
+              <Button type="submit" className="gap-2 md:self-end"><Plus className="w-4 h-4" /> Registrar</Button>
+            </form>
+          )}
+          {excedentes.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No hay ítems excedentes registrados.</p>
+          ) : (
+            <div className="space-y-2">
+              {excedentes.map((x) => (
+                <div key={x.id_item} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
+                  <span className="text-muted-foreground w-24">{new Date(x.fecha).toLocaleDateString("es-AR")}</span>
+                  <span className="font-medium">{x.descripcion}</span>
+                  {x.cantidad != null && <span className="text-muted-foreground">{x.cantidad} {x.unidad ?? ""}</span>}
+                  <span className="text-muted-foreground flex-1 truncate">{x.motivo ?? ""}</span>
+                  {cargaDocs && (
+                    <Button size="sm" variant="ghost" onClick={() => borrarExcedente(x.id_item)} title="Eliminar"><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>
                   )}
                 </div>
               ))}
