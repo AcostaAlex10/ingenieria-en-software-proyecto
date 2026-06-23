@@ -200,7 +200,7 @@ final class MaquinariaController
                     SUM(produccion_realizada) AS produccion,
                     SUM(combustible_consumido) AS combustible
              FROM registro_maquinaria
-             WHERE operario IS NOT NULL AND operario <> ""
+             WHERE operario IS NOT NULL AND LENGTH(TRIM(operario)) > 0
              GROUP BY operario
              ORDER BY produccion DESC'
         );
