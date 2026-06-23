@@ -21,6 +21,7 @@ require_once __DIR__ . '/../src/DocumentoController.php';
 require_once __DIR__ . '/../src/ReporteController.php';
 require_once __DIR__ . '/../src/InactividadController.php';
 require_once __DIR__ . '/../src/ItemExcedenteController.php';
+require_once __DIR__ . '/../src/AnalisisController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -70,6 +71,7 @@ $documento = new DocumentoController($db);
 $reporte = new ReporteController($db);
 $inactividad = new InactividadController($db);
 $itemExcedente = new ItemExcedenteController($db);
+$analisis = new AnalisisController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -165,6 +167,16 @@ if ($recurso === 'reportes') {
         case 'DELETE': exigirRol($usuario, ROLES_DOC); $reporte->eliminar($idRep); break;
         default:       responder(405, ['error' => 'Metodo no permitido']);
     }
+    exit;
+}
+
+// ============================================================
+//  Analisis y alertas:  /analisis  (RF11/RF13)
+// ============================================================
+if ($recurso === 'analisis') {
+    $usuario = exigirAutenticacion($jwtSecreto);
+    if ($metodoHttp === 'GET') { $analisis->resumen($usuario['rol'] ?? null); }
+    else { responder(405, ['error' => 'Metodo no permitido']); }
     exit;
 }
 

@@ -316,3 +316,31 @@ export async function crearExcedente(
 export async function eliminarExcedente(id: number): Promise<void> {
   await parse(await apiFetch(`/proyectos/excedente/${id}`, { method: "DELETE" }));
 }
+
+// ---------- Análisis y alertas (RF11/RF13) ----------
+export interface AnalisisProyecto {
+  id_proyecto: number;
+  nombre: string;
+  estado: string;
+  avance_real: number;
+  avance_esperado: number | null;
+  desvio_avance: number | null;
+  alerta_avance: boolean;
+  materiales_excedidos: number;
+  presupuesto?: number;
+  ejecutado?: number;
+  diferencia?: number;
+}
+export interface Alerta {
+  tipo: "avance" | "material";
+  gravedad: "alta" | "media" | "baja";
+  proyecto: string;
+  mensaje: string;
+}
+export interface Analisis {
+  proyectos: AnalisisProyecto[];
+  alertas: Alerta[];
+}
+export async function obtenerAnalisis(): Promise<Analisis> {
+  return parse(await apiFetch(`/analisis`));
+}
