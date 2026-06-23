@@ -36,3 +36,8 @@ export function puedeVerCostos(rol: string = rolActual()): boolean {
 export function puedeGestionarUsuarios(rol: string = rolActual()): boolean {
   return rol === "AdministradorSistema";
 }
+
+/** Cargar documentación de obra (todos los roles operativos, menos el Gerente que solo consulta). */
+export function puedeCargarDocumentos(rol: string = rolActual()): boolean {
+  return rol === "AdministradorSistema" || rol === "PersonalAdministrativo" || rol === "PersonalTecnico";
+}

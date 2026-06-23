@@ -93,3 +93,66 @@ CREATE TABLE IF NOT EXISTS incidencia (
   CONSTRAINT fk_incidencia_proyecto FOREIGN KEY (id_proyecto)
     REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
 );
+
+-- ============================================================
+--  Sprint 3 - Materiales y Documentacion
+-- ============================================================
+
+-- Catalogo global de materiales (RF04: listas precargadas). El nombre es
+-- unico para poder precargar con INSERT IGNORE sin duplicar.
+CREATE TABLE IF NOT EXISTS material (
+  id_material INT AUTO_INCREMENT PRIMARY KEY,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  unidad      VARCHAR(30) NOT NULL
+);
+
+-- Material asignado a una obra (RF10): cuanto se preve usar. Un material
+-- se asigna una sola vez por obra (los consumos se descuentan de aca).
+CREATE TABLE IF NOT EXISTS asignacion_material (
+  id_asignacion     INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto       INT NOT NULL,
+  id_material       INT NOT NULL,
+  cantidad_asignada DECIMAL(12,2) NOT NULL,
+  CONSTRAINT fk_asig_proyecto FOREIGN KEY (id_proyecto) REFERENCES proyecto(id_proyecto) ON DELETE CASCADE,
+  CONSTRAINT fk_asig_material FOREIGN KEY (id_material) REFERENCES material(id_material),
+  CONSTRAINT uq_asig_proyecto_material UNIQUE (id_proyecto, id_material)
+);
+
+-- Consumos de material registrados en obra (RF10). La suma de consumos
+-- vs. la cantidad asignada permite detectar excesos (RF12).
+CREATE TABLE IF NOT EXISTS consumo_material (
+  id_consumo         INT AUTO_INCREMENT PRIMARY KEY,
+  id_asignacion      INT NOT NULL,
+  fecha              DATE NOT NULL,
+  cantidad_consumida DECIMAL(12,2) NOT NULL,
+  observaciones      VARCHAR(255) NULL,
+  CONSTRAINT fk_consumo_asig FOREIGN KEY (id_asignacion)
+    REFERENCES asignacion_material(id_asignacion) ON DELETE CASCADE
+);
+
+-- Documentacion de la obra (RF16): se guarda el dato del documento y un
+-- enlace (Drive/URL), no el binario.
+CREATE TABLE IF NOT EXISTS documento (
+  id_documento INT AUTO_INCREMENT PRIMARY KEY,
+  id_proyecto  INT NOT NULL,
+  nombre       VARCHAR(150) NOT NULL,
+  tipo         ENUM('pdf','imagen','otro') NOT NULL DEFAULT 'otro',
+  categoria    VARCHAR(60) NOT NULL DEFAULT 'General',
+  url          VARCHAR(500) NOT NULL,
+  fecha_carga  DATE NOT NULL,
+  CONSTRAINT fk_documento_proyecto FOREIGN KEY (id_proyecto)
+    REFERENCES proyecto(id_proyecto) ON DELETE CASCADE
+);
+
+-- Catalogo de materiales precargado (RF04). INSERT IGNORE => idempotente.
+INSERT IGNORE INTO material (nombre, unidad) VALUES
+  ('Cemento', 'bolsa'),
+  ('Arena', 'm3'),
+  ('Piedra triturada', 'm3'),
+  ('Hierro del 8', 'kg'),
+  ('Hierro del 10', 'kg'),
+  ('Ladrillo comun', 'unidad'),
+  ('Cal', 'bolsa'),
+  ('Hormigon elaborado', 'm3'),
+  ('Madera (encofrado)', 'm2'),
+  ('Pintura latex', 'litro');

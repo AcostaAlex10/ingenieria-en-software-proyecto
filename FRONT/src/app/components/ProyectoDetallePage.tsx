@@ -7,18 +7,22 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
   listarAvances, resumenAvances, crearAvance,
   listarAsistencias, crearAsistencia, eliminarAsistencia,
   listarIncidencias, crearIncidencia, eliminarIncidencia,
+  listarCatalogoMateriales, listarMaterialesObra, asignarMaterial,
+  eliminarAsignacionMaterial, crearConsumo,
+  listarDocumentos, crearDocumento, eliminarDocumento,
   type Proyecto, type Planificacion, type Avance, type Resumen,
   type Asistencia, type Incidencia, type EstadoAsistencia,
   type TipoIncidencia, type GravedadIncidencia,
+  type Material, type AsignacionMaterial, type Documento, type TipoDocumento,
 } from "../api/proyectos";
-import { puedeGestionarObras, puedeRegistrarAvance } from "../auth/permisos";
+import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos } from "../auth/permisos";
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 
@@ -44,9 +48,10 @@ export default function ProyectoDetallePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // Permisos (RF19): quién puede planificar y quién puede registrar avances.
+  // Permisos (RF19): quién puede planificar, registrar avances y cargar docs.
   const gestiona = puedeGestionarObras();
   const registraAvance = puedeRegistrarAvance();
+  const cargaDocs = puedeCargarDocumentos();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [plan, setPlan] = useState<Planificacion | null>(null);
@@ -67,15 +72,28 @@ export default function ProyectoDetallePage() {
     { tipo: "clima", gravedad: "media", fecha: hoy(), descripcion: "", dias_retraso: "" }
   );
 
+  // Materiales (RF10/RF12) y documentación (RF16).
+  const [catalogo, setCatalogo] = useState<Material[]>([]);
+  const [materiales, setMateriales] = useState<AsignacionMaterial[]>([]);
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
+  const [formMat, setFormMat] = useState({ id_material: "", cantidad_asignada: "" });
+  const [consumoInput, setConsumoInput] = useState<Record<number, string>>({});
+  const [formDoc, setFormDoc] = useState<{ nombre: string; tipo: TipoDocumento; categoria: string; url: string }>(
+    { nombre: "", tipo: "pdf", categoria: "", url: "" }
+  );
+
   const cargar = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
       const proy = await obtenerProyecto(id);
       setProyecto(proy);
-      // Seguimiento operativo: dependen solo de la obra (no de la planificación).
+      // Seguimiento operativo + materiales + documentos: dependen solo de la obra.
       setAsistencias(await listarAsistencias(id));
       setIncidencias(await listarIncidencias(id));
+      setMateriales(await listarMaterialesObra(id));
+      setDocumentos(await listarDocumentos(id));
+      if (catalogo.length === 0) setCatalogo(await listarCatalogoMateriales());
       const planif = await obtenerPlanificacion(id);
       setPlan(planif);
       if (planif) {
@@ -176,6 +194,76 @@ export default function ProyectoDetallePage() {
     try {
       await eliminarIncidencia(idI);
       setIncidencias((prev) => prev.filter((x) => x.id_incidencia !== idI));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
+    }
+  }
+
+  // --- Materiales (RF10/RF12) ---
+  async function asignarMat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await asignarMaterial(id, {
+        id_material: parseInt(formMat.id_material, 10),
+        cantidad_asignada: parseFloat(formMat.cantidad_asignada),
+      });
+      toast.success("Material asignado a la obra");
+      setFormMat({ id_material: "", cantidad_asignada: "" });
+      setMateriales(await listarMaterialesObra(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al asignar el material");
+    }
+  }
+  async function borrarAsignacion(idAsig: number) {
+    if (!id) return;
+    try {
+      await eliminarAsignacionMaterial(idAsig);
+      setMateriales(await listarMaterialesObra(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar");
+    }
+  }
+  async function registrarConsumo(idAsig: number) {
+    if (!id) return;
+    const cantidad = parseFloat(consumoInput[idAsig] ?? "");
+    if (!cantidad || cantidad <= 0) {
+      toast.error("Ingresá una cantidad válida");
+      return;
+    }
+    try {
+      await crearConsumo(idAsig, { fecha: hoy(), cantidad_consumida: cantidad });
+      toast.success("Consumo registrado");
+      setConsumoInput((prev) => ({ ...prev, [idAsig]: "" }));
+      setMateriales(await listarMaterialesObra(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrar el consumo");
+    }
+  }
+
+  // --- Documentación (RF16) ---
+  async function guardarDoc(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    try {
+      await crearDocumento(id, {
+        nombre: formDoc.nombre,
+        tipo: formDoc.tipo,
+        categoria: formDoc.categoria || "General",
+        url: formDoc.url,
+        fecha_carga: hoy(),
+      });
+      toast.success("Documento agregado");
+      setFormDoc({ nombre: "", tipo: "pdf", categoria: "", url: "" });
+      setDocumentos(await listarDocumentos(id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al agregar el documento");
+    }
+  }
+  async function borrarDoc(idDoc: number) {
+    try {
+      await eliminarDocumento(idDoc);
+      setDocumentos((prev) => prev.filter((d) => d.id_documento !== idDoc));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
@@ -457,6 +545,138 @@ export default function ProyectoDetallePage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Materiales (RF10/RF12) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Package className="w-5 h-5" /> Materiales</CardTitle>
+          <CardDescription>Materiales asignados a la obra y consumo registrado. Se avisa si se excede lo asignado.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {gestiona && (
+            <form onSubmit={asignarMat} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div className="space-y-2">
+                <Label>Material</Label>
+                <Select value={formMat.id_material} onValueChange={(v) => setFormMat({ ...formMat, id_material: v })}>
+                  <SelectTrigger><SelectValue placeholder="Elegí un material" /></SelectTrigger>
+                  <SelectContent>
+                    {catalogo.map((m) => (
+                      <SelectItem key={m.id_material} value={String(m.id_material)}>{m.nombre} ({m.unidad})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cant">Cantidad asignada</Label>
+                <Input id="cant" type="number" min="0" step="0.01" required value={formMat.cantidad_asignada}
+                  onChange={(e) => setFormMat({ ...formMat, cantidad_asignada: e.target.value })} />
+              </div>
+              <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Asignar material</Button>
+            </form>
+          )}
+          {materiales.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Todavía no hay materiales asignados a la obra.</p>
+          ) : (
+            <div className="space-y-2">
+              {materiales.map((m) => (
+                <div key={m.id_asignacion} className="border rounded-md px-4 py-3 text-sm space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-medium">{m.nombre}</span>
+                    <span className="text-muted-foreground">
+                      {m.consumido} / {m.cantidad_asignada} {m.unidad} · restante {m.restante} {m.unidad}
+                    </span>
+                    {m.excedido && (
+                      <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Excedido</Badge>
+                    )}
+                    {gestiona && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => borrarAsignacion(m.id_asignacion)} title="Quitar material">
+                        <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="h-2 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, m.cantidad_asignada > 0 ? (m.consumido / m.cantidad_asignada) * 100 : 0)}%`, background: m.excedido ? "#ef4444" : "#3b82f6" }} />
+                  </div>
+                  {registraAvance && (
+                    <div className="flex items-end gap-2 pt-1">
+                      <Input type="number" min="0" step="0.01" placeholder={`Consumo (${m.unidad})`}
+                        value={consumoInput[m.id_asignacion] ?? ""}
+                        onChange={(e) => setConsumoInput((prev) => ({ ...prev, [m.id_asignacion]: e.target.value }))}
+                        className="max-w-[220px]" />
+                      <Button size="sm" type="button" onClick={() => registrarConsumo(m.id_asignacion)} className="gap-1">
+                        <Plus className="w-4 h-4" /> Registrar consumo
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Documentación (RF16) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5" /> Documentación</CardTitle>
+          <CardDescription>Documentos de la obra (planos, contratos, fotos). Se guarda un enlace al archivo.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {cargaDocs && (
+            <form onSubmit={guardarDoc} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="dnom">Nombre</Label>
+                <Input id="dnom" required value={formDoc.nombre}
+                  onChange={(e) => setFormDoc({ ...formDoc, nombre: e.target.value })} placeholder="Ej: Plano de planta" />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select value={formDoc.tipo} onValueChange={(v) => setFormDoc({ ...formDoc, tipo: v as TipoDocumento })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">PDF</SelectItem>
+                    <SelectItem value="imagen">Imagen</SelectItem>
+                    <SelectItem value="otro">Otro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dcat">Categoría</Label>
+                <Input id="dcat" value={formDoc.categoria}
+                  onChange={(e) => setFormDoc({ ...formDoc, categoria: e.target.value })} placeholder="Plano / Contrato / Foto" />
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <Label htmlFor="durl">Enlace (URL)</Label>
+                <Input id="durl" type="url" required value={formDoc.url}
+                  onChange={(e) => setFormDoc({ ...formDoc, url: e.target.value })} placeholder="https://drive.google.com/..." />
+              </div>
+              <Button type="submit" className="gap-2 md:self-end"><Plus className="w-4 h-4" /> Agregar</Button>
+            </form>
+          )}
+          {documentos.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Todavía no hay documentos cargados.</p>
+          ) : (
+            <div className="space-y-2">
+              {documentos.map((d) => (
+                <div key={d.id_documento} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
+                  <span className="text-muted-foreground w-24">{new Date(d.fecha_carga).toLocaleDateString("es-AR")}</span>
+                  <span className="font-medium">{d.nombre}</span>
+                  <Badge variant="secondary">{d.categoria}</Badge>
+                  <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-1 ml-auto">
+                    Abrir <ExternalLink className="w-3 h-3" />
+                  </a>
+                  {cargaDocs && (
+                    <Button size="sm" variant="ghost" onClick={() => borrarDoc(d.id_documento)} title="Eliminar">
+                      <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

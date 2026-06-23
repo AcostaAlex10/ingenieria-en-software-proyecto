@@ -15,6 +15,9 @@ require_once __DIR__ . '/../src/PlanificacionController.php';
 require_once __DIR__ . '/../src/AvanceController.php';
 require_once __DIR__ . '/../src/AsistenciaController.php';
 require_once __DIR__ . '/../src/IncidenciaController.php';
+require_once __DIR__ . '/../src/MaterialController.php';
+require_once __DIR__ . '/../src/MaterialObraController.php';
+require_once __DIR__ . '/../src/DocumentoController.php';
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -45,8 +48,9 @@ $jwtSecreto = Env::get('JWT_SECRET', 'cambiar_esta_clave');
 $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 
 // Grupos de roles autorizados (RF19). El AdministradorSistema es superusuario.
-const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra y planificacion
-const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar/editar/eliminar avance fisico
+const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra, planificacion y materiales
+const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar avance, asistencia, incidencias y consumos
+const ROLES_DOC = ['AdministradorSistema', 'PersonalAdministrativo', 'PersonalTecnico']; // cargar documentacion (todos menos Gerente)
 
 $db = Database::conexion();
 
@@ -56,6 +60,9 @@ $planificacion = new PlanificacionController($db);
 $avance = new AvanceController($db);
 $asistencia = new AsistenciaController($db);
 $incidencia = new IncidenciaController($db);
+$material = new MaterialController($db);
+$materialObra = new MaterialObraController($db);
+$documento = new DocumentoController($db);
 
 // --- Parseo de la ruta ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
@@ -108,6 +115,19 @@ if ($recurso === 'auth') {
 // ============================================================
 if ($recurso === 'health') {
     echo json_encode(['status' => 'ok']);
+    exit;
+}
+
+// ============================================================
+//  Catalogo de materiales:  /materiales  (RF04)
+// ============================================================
+if ($recurso === 'materiales') {
+    $usuario = exigirAutenticacion($jwtSecreto);
+    switch ($metodoHttp) {
+        case 'GET':  $material->listar(); break;
+        case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $material->crear(leerCuerpoJson()); break;
+        default:     responder(405, ['error' => 'Metodo no permitido']);
+    }
     exit;
 }
 
@@ -182,6 +202,41 @@ if ($recurso === 'proyectos') {
         exit;
     }
 
+    // /proyectos/material/{idAsignacion}[/consumos]  (RF10/RF12)
+    if ($id === 'material') {
+        $idAsig = $segmentos[2] ?? null;
+        if ($idAsig === null) { responder(404, ['error' => 'Falta el id de asignación']); exit; }
+        if (($segmentos[3] ?? null) === 'consumos') {
+            switch ($metodoHttp) {
+                case 'GET':  $materialObra->listarConsumos($idAsig); break;
+                case 'POST': exigirRol($usuario, ROLES_AVANCE); $materialObra->crearConsumo($idAsig, leerCuerpoJson()); break;
+                default:     responder(405, ['error' => 'Metodo no permitido']);
+            }
+            exit;
+        }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_GESTION_OBRA); $materialObra->eliminarAsignacion($idAsig); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // /proyectos/consumo/{id}  -> DELETE de un consumo de material
+    if ($id === 'consumo') {
+        $idc = $segmentos[2] ?? null;
+        if ($idc === null) { responder(404, ['error' => 'Falta el id de consumo']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $materialObra->eliminarConsumo($idc); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
+    // /proyectos/documento/{id}  -> DELETE de un documento
+    if ($id === 'documento') {
+        $idd = $segmentos[2] ?? null;
+        if ($idd === null) { responder(404, ['error' => 'Falta el id de documento']); exit; }
+        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $documento->eliminar($idd); }
+        else { responder(405, ['error' => 'Metodo no permitido']); }
+        exit;
+    }
+
     // Sub-recurso: /proyectos/{id}/asistencias  (RF06)
     if (($segmentos[2] ?? null) === 'asistencias') {
         switch ($metodoHttp) {
@@ -197,6 +252,26 @@ if ($recurso === 'proyectos') {
         switch ($metodoHttp) {
             case 'GET':  $incidencia->listarPorProyecto($id); break;
             case 'POST': exigirRol($usuario, ROLES_AVANCE); $incidencia->crear($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/materiales  (RF10/RF12)
+    if (($segmentos[2] ?? null) === 'materiales') {
+        switch ($metodoHttp) {
+            case 'GET':  $materialObra->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $materialObra->asignar($id, leerCuerpoJson()); break;
+            default:     responder(405, ['error' => 'Metodo no permitido']);
+        }
+        exit;
+    }
+
+    // Sub-recurso: /proyectos/{id}/documentos  (RF16)
+    if (($segmentos[2] ?? null) === 'documentos') {
+        switch ($metodoHttp) {
+            case 'GET':  $documento->listarPorProyecto($id); break;
+            case 'POST': exigirRol($usuario, ROLES_DOC); $documento->crear($id, leerCuerpoJson()); break;
             default:     responder(405, ['error' => 'Metodo no permitido']);
         }
         exit;

@@ -64,6 +64,42 @@ export interface Incidencia {
   dias_retraso: number;
 }
 
+// Materiales (Sprint 3)
+export interface Material {
+  id_material: number;
+  nombre: string;
+  unidad: string;
+}
+export interface AsignacionMaterial {
+  id_asignacion: number;
+  id_material: number;
+  nombre: string;
+  unidad: string;
+  cantidad_asignada: number;
+  consumido: number;
+  restante: number;
+  excedido: boolean;
+}
+export interface ConsumoMaterial {
+  id_consumo: number;
+  id_asignacion: number;
+  fecha: string;
+  cantidad_consumida: number;
+  observaciones: string | null;
+}
+
+// Documentacion (Sprint 3)
+export type TipoDocumento = "pdf" | "imagen" | "otro";
+export interface Documento {
+  id_documento: number;
+  id_proyecto: number;
+  nombre: string;
+  tipo: TipoDocumento;
+  categoria: string;
+  url: string;
+  fecha_carga: string;
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -152,4 +188,47 @@ export async function crearIncidencia(
 }
 export async function eliminarIncidencia(idIncidencia: number): Promise<void> {
   await parse(await apiFetch(`/proyectos/incidencia/${idIncidencia}`, { method: "DELETE" }));
+}
+
+// ---------- Materiales (RF04/RF10/RF12) ----------
+export async function listarCatalogoMateriales(): Promise<Material[]> {
+  return parse(await apiFetch(`/materiales`));
+}
+export async function listarMaterialesObra(idProyecto: string): Promise<AsignacionMaterial[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/materiales`));
+}
+export async function asignarMaterial(
+  idProyecto: string,
+  datos: { id_material: number; cantidad_asignada: number }
+): Promise<{ id_asignacion: number }> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/materiales`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarAsignacionMaterial(idAsignacion: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/material/${idAsignacion}`, { method: "DELETE" }));
+}
+export async function listarConsumos(idAsignacion: number): Promise<ConsumoMaterial[]> {
+  return parse(await apiFetch(`/proyectos/material/${idAsignacion}/consumos`));
+}
+export async function crearConsumo(
+  idAsignacion: number,
+  datos: { fecha: string; cantidad_consumida: number; observaciones?: string }
+): Promise<{ id_consumo: number }> {
+  return parse(await apiFetch(`/proyectos/material/${idAsignacion}/consumos`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarConsumo(idConsumo: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/consumo/${idConsumo}`, { method: "DELETE" }));
+}
+
+// ---------- Documentacion (RF16) ----------
+export async function listarDocumentos(idProyecto: string): Promise<Documento[]> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/documentos`));
+}
+export async function crearDocumento(
+  idProyecto: string,
+  datos: { nombre: string; tipo: TipoDocumento; categoria: string; url: string; fecha_carga: string }
+): Promise<Documento> {
+  return parse(await apiFetch(`/proyectos/${idProyecto}/documentos`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function eliminarDocumento(idDocumento: number): Promise<void> {
+  await parse(await apiFetch(`/proyectos/documento/${idDocumento}`, { method: "DELETE" }));
 }
