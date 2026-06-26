@@ -91,10 +91,18 @@ export async function restablecerContrasena(token: string, contrasena: string): 
   return data.mensaje ?? "Contraseña actualizada";
 }
 
+// Peticiones de escritura en curso, para deduplicar dobles envíos (varios
+// clicks seguidos en el mismo botón antes de que responda el servidor).
+const enVuelo = new Map<string, Promise<Response>>();
+
 /**
  * Wrapper de fetch para llamadas autenticadas: agrega automaticamente el header
  * Authorization: Bearer <token> y reintenta si el backend esta arrancando.
  * Si el backend responde 401 (token vencido o invalido), limpia la sesion.
+ *
+ * Ademas evita peticiones de escritura DUPLICADAS: si ya hay una identica
+ * (mismo metodo + ruta + cuerpo) en curso, reutiliza su resultado en vez de
+ * mandar otra. Asi un doble click no crea registros repetidos.
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
@@ -102,10 +110,27 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetchConReintentos(`${API_URL}${path}`, { ...options, headers });
+  const metodo = (options.method ?? "GET").toUpperCase();
+  const cuerpo = typeof options.body === "string" ? options.body : "";
+  // Solo deduplicamos escrituras (POST/PUT/DELETE), nunca lecturas (GET).
+  const clave = metodo !== "GET" ? `${metodo} ${path} ${cuerpo}` : "";
 
+  if (clave && enVuelo.has(clave)) {
+    // Ya hay una identica en curso: devolvemos una copia de su respuesta.
+    return (await enVuelo.get(clave)!).clone();
+  }
+
+  const promesa = fetchConReintentos(`${API_URL}${path}`, { ...options, headers });
+  if (clave) {
+    enVuelo.set(clave, promesa);
+    promesa.finally(() => enVuelo.delete(clave));
+  }
+
+  const res = await promesa;
   if (res.status === 401) {
     clearSession();
   }
-  return res;
+  // Si la respuesta puede compartirse con otra llamada deduplicada, devolvemos
+  // un clon para que cada quien pueda leer el body de forma independiente.
+  return clave ? res.clone() : res;
 }

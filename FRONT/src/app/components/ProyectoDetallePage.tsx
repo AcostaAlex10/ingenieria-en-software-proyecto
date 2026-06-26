@@ -96,21 +96,35 @@ export default function ProyectoDetallePage() {
     if (!id) return;
     setLoading(true);
     try {
-      const proy = await obtenerProyecto(id);
+      // Todo lo de la obra se pide EN PARALELO (antes era en serie y con el
+      // arranque en frío de Render tardaba >10 s mostrando "Cargando obra...").
+      const [proy, asis, inci, mats, docs, inacs, excs, planif] = await Promise.all([
+        obtenerProyecto(id),
+        listarAsistencias(id),
+        listarIncidencias(id),
+        listarMaterialesObra(id),
+        listarDocumentos(id),
+        listarInactividades(id),
+        listarExcedentes(id),
+        obtenerPlanificacion(id),
+      ]);
       setProyecto(proy);
-      // Seguimiento operativo + materiales + documentos: dependen solo de la obra.
-      setAsistencias(await listarAsistencias(id));
-      setIncidencias(await listarIncidencias(id));
-      setMateriales(await listarMaterialesObra(id));
-      setDocumentos(await listarDocumentos(id));
-      setInactividades(await listarInactividades(id));
-      setExcedentes(await listarExcedentes(id));
-      if (catalogo.length === 0) setCatalogo(await listarCatalogoMateriales());
-      const planif = await obtenerPlanificacion(id);
+      setAsistencias(asis);
+      setIncidencias(inci);
+      setMateriales(mats);
+      setDocumentos(docs);
+      setInactividades(inacs);
+      setExcedentes(excs);
       setPlan(planif);
+      // El catálogo de materiales no bloquea la carga de la obra.
+      if (catalogo.length === 0) listarCatalogoMateriales().then(setCatalogo).catch(() => {});
       if (planif) {
-        setAvances(await listarAvances(planif.id_planificacion));
-        setResumen(await resumenAvances(planif.id_planificacion));
+        const [av, res] = await Promise.all([
+          listarAvances(planif.id_planificacion),
+          resumenAvances(planif.id_planificacion),
+        ]);
+        setAvances(av);
+        setResumen(res);
       } else {
         setAvances([]);
         setResumen(null);
