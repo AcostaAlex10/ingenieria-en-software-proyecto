@@ -30,6 +30,7 @@ import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos, puede
 // Fecha de HOY en zona horaria LOCAL (no UTC), para que de noche en Argentina
 // no muestre el día siguiente.
 const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
 // Etiquetas y colores para mostrar asistencia e incidencias.
 const ESTADO_ASIS: Record<EstadoAsistencia, { label: string; color: string }> = {
@@ -379,7 +380,7 @@ export default function ProyectoDetallePage() {
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
           <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {proyecto.ubicacion}</div>
           <div className="flex items-center gap-2"><User className="w-4 h-4" /> {proyecto.encargado}</div>
-          <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Inicio: {new Date(proyecto.fechaInicio).toLocaleDateString("es-AR")}</div>
+          <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Inicio: {fmtFecha(proyecto.fechaInicio)}</div>
           {/* RF15: certificación por monto = presupuesto x % de avance (oculto al técnico, RF20) */}
           {verCostos && proyecto.presupuesto != null && (
             <div className="flex items-center gap-2 md:col-span-3 pt-1" style={{ color: "var(--foreground)" }}>
@@ -483,7 +484,7 @@ export default function ProyectoDetallePage() {
                 <div className="space-y-2">
                   {avances.map((a) => (
                     <div key={a.id_avance} className="flex items-center justify-between border rounded-md px-4 py-2 text-sm">
-                      <span className="text-muted-foreground">{new Date(a.fecha).toLocaleDateString("es-AR")}</span>
+                      <span className="text-muted-foreground">{fmtFecha(a.fecha)}</span>
                       <span>Cant.: <b>{a.cantidad_ejecutada}</b></span>
                       <span>Avance: <b>{a.porcentaje_avance}%</b></span>
                       <span className="text-muted-foreground flex-1 text-right truncate ml-4">{a.observaciones ?? ""}</span>
@@ -545,7 +546,7 @@ export default function ProyectoDetallePage() {
                 const info = ESTADO_ASIS[a.estado];
                 return (
                   <div key={a.id_asistencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                    <span className="text-muted-foreground w-24">{new Date(a.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="text-muted-foreground w-24">{fmtFecha(a.fecha)}</span>
                     <span className="font-medium">{a.trabajador}</span>
                     <Badge style={{ background: info.color }}>{info.label}</Badge>
                     <span className="text-muted-foreground flex-1 truncate">{a.justificacion ?? ""}</span>
@@ -621,7 +622,7 @@ export default function ProyectoDetallePage() {
                 const g = GRAVEDAD_INC[x.gravedad];
                 return (
                   <div key={x.id_incidencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                    <span className="text-muted-foreground w-24">{new Date(x.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="text-muted-foreground w-24">{fmtFecha(x.fecha)}</span>
                     <span className="font-medium">{TIPO_INC[x.tipo]}</span>
                     <Badge style={{ background: g.color }}>{g.label}</Badge>
                     <span className="text-muted-foreground flex-1 truncate">{x.descripcion}</span>
@@ -753,7 +754,7 @@ export default function ProyectoDetallePage() {
             <div className="space-y-2">
               {documentos.map((d) => (
                 <div key={d.id_documento} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                  <span className="text-muted-foreground w-24">{new Date(d.fecha_carga).toLocaleDateString("es-AR")}</span>
+                  <span className="text-muted-foreground w-24">{fmtFecha(d.fecha_carga)}</span>
                   <span className="font-medium">{d.nombre}</span>
                   <Badge variant="secondary">{d.categoria}</Badge>
                   <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-1 ml-auto">
@@ -802,7 +803,7 @@ export default function ProyectoDetallePage() {
               {inactividades.map((p) => (
                 <div key={p.id_periodo} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
                   <span className="text-muted-foreground">
-                    {new Date(p.fecha_inicio).toLocaleDateString("es-AR")}{p.fecha_fin ? ` → ${new Date(p.fecha_fin).toLocaleDateString("es-AR")}` : ""}
+                    {fmtFecha(p.fecha_inicio)}{p.fecha_fin ? ` → ${fmtFecha(p.fecha_fin)}` : ""}
                   </span>
                   <span className="flex-1">{p.motivo}</span>
                   {cargaDocs && (
@@ -849,7 +850,7 @@ export default function ProyectoDetallePage() {
             <div className="space-y-2">
               {excedentes.map((x) => (
                 <div key={x.id_item} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                  <span className="text-muted-foreground w-24">{new Date(x.fecha).toLocaleDateString("es-AR")}</span>
+                  <span className="text-muted-foreground w-24">{fmtFecha(x.fecha)}</span>
                   <span className="font-medium">{x.descripcion}</span>
                   {x.cantidad != null && <span className="text-muted-foreground">{x.cantidad} {x.unidad ?? ""}</span>}
                   <span className="text-muted-foreground flex-1 truncate">{x.motivo ?? ""}</span>

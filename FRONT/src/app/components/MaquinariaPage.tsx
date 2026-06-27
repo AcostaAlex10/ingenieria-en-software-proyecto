@@ -19,6 +19,7 @@ import {
 import { puedeGestionarObras, puedeCargarDocumentos } from "../auth/permisos";
 
 const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
 export default function MaquinariaPage() {
   const [maquinas, setMaquinas] = useState<Maquinaria[]>([]);
@@ -168,7 +169,10 @@ export default function MaquinariaPage() {
                   <div className="space-y-1 col-span-2 md:col-span-6"><Label>Obra (opcional)</Label>
                     <Select value={formReg.id_proyecto} onValueChange={(v) => setFormReg({ ...formReg, id_proyecto: v })}>
                       <SelectTrigger><SelectValue placeholder="Vincular este uso a una obra (opcional)" /></SelectTrigger>
-                      <SelectContent>{proyectos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        <SelectItem value="">Sin obra</SelectItem>
+                        {proyectos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}
+                      </SelectContent>
                     </Select></div>
                   <div className="space-y-1"><Label htmlFor="rf">Fecha</Label><Input id="rf" type="date" required value={formReg.fecha} onChange={(e) => setFormReg({ ...formReg, fecha: e.target.value })} /></div>
                   <div className="space-y-1"><Label htmlFor="ro">Operario</Label><Input id="ro" value={formReg.operario} onChange={(e) => setFormReg({ ...formReg, operario: e.target.value })} /></div>
@@ -182,7 +186,7 @@ export default function MaquinariaPage() {
                 <div className="space-y-1">
                   {registros.map((r) => (
                     <div key={r.id_registro} className="flex items-center gap-3 border rounded-md px-3 py-2 text-sm">
-                      <span className="text-muted-foreground w-24">{new Date(r.fecha).toLocaleDateString("es-AR")}</span>
+                      <span className="text-muted-foreground w-24">{fmtFecha(r.fecha)}</span>
                       <span className="w-32">{r.operario ?? "—"}</span>
                       <span>{r.horas_uso} h</span>
                       <span>{r.combustible_consumido} L</span>
@@ -212,7 +216,7 @@ export default function MaquinariaPage() {
                 <div className="space-y-1">
                   {fallas.map((f) => (
                     <div key={f.id_falla} className="flex items-center gap-3 border rounded-md px-3 py-2 text-sm">
-                      <span className="text-muted-foreground w-24">{new Date(f.fecha).toLocaleDateString("es-AR")}</span>
+                      <span className="text-muted-foreground w-24">{fmtFecha(f.fecha)}</span>
                       {f.componente && <Badge variant="secondary">{f.componente}</Badge>}
                       <span className="flex-1">{f.descripcion}</span>
                       {f.reemplazo && <Badge variant="outline">Reemplazo</Badge>}

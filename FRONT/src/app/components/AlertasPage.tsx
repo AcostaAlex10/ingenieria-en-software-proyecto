@@ -101,7 +101,7 @@ export default function AlertasPage() {
                   <span className="font-medium">{p.nombre}</span>
                   <span className="mono">{pesos(p.presupuesto ?? 0)}</span>
                   <span className="mono">{pesos(p.ejecutado ?? 0)}</span>
-                  <span className="mono" style={{ color: "#22c55e" }}>{pesos(p.diferencia ?? 0)}</span>
+                  <span className="mono" style={{ color: (p.diferencia ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>{pesos(p.diferencia ?? 0)}</span>
                 </div>
               ))}
             </div>

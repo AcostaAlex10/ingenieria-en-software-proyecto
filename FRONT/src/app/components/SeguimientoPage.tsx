@@ -18,6 +18,7 @@ import {
 import { puedeRegistrarAvance } from "../auth/permisos";
 
 const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 const ESTADO_ASIS: Record<EstadoAsistencia, { label: string; color: string }> = {
   presente: { label: "Presente", color: "#22c55e" }, ausente: { label: "Ausente", color: "#ef4444" }, tarde: { label: "Tarde", color: "#e8981e" },
 };
@@ -95,7 +96,7 @@ export default function SeguimientoPage() {
               {asistencias.length === 0 ? <p className="text-muted-foreground text-sm">Sin asistencias registradas.</p> : (
                 <div className="space-y-2">{asistencias.map((a) => { const i = ESTADO_ASIS[a.estado]; return (
                   <div key={a.id_asistencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                    <span className="text-muted-foreground w-24">{new Date(a.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="text-muted-foreground w-24">{fmtFecha(a.fecha)}</span>
                     <span className="font-medium">{a.trabajador}</span><Badge style={{ background: i.color }}>{i.label}</Badge>
                     <span className="text-muted-foreground flex-1 truncate">{a.justificacion ?? ""}</span>
                     {registra && <Button size="sm" variant="ghost" onClick={() => eliminarAsistencia(a.id_asistencia).then(() => setAsistencias((p) => p.filter((x) => x.id_asistencia !== a.id_asistencia))).catch(() => toast.error("Error"))}><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>}
@@ -124,7 +125,7 @@ export default function SeguimientoPage() {
               {incidencias.length === 0 ? <p className="text-muted-foreground text-sm">Sin incidencias registradas.</p> : (
                 <div className="space-y-2">{incidencias.map((x) => { const g = GRAVEDAD_INC[x.gravedad]; return (
                   <div key={x.id_incidencia} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                    <span className="text-muted-foreground w-24">{new Date(x.fecha).toLocaleDateString("es-AR")}</span>
+                    <span className="text-muted-foreground w-24">{fmtFecha(x.fecha)}</span>
                     <span className="font-medium">{TIPO_INC[x.tipo]}</span><Badge style={{ background: g.color }}>{g.label}</Badge>
                     <span className="text-muted-foreground flex-1 truncate">{x.descripcion}</span>
                     {x.dias_retraso > 0 && <span className="text-xs text-muted-foreground whitespace-nowrap">+{x.dias_retraso} d</span>}

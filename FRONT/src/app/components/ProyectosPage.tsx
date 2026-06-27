@@ -23,6 +23,7 @@ const HOY = (() => {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 })();
+const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
 function estadoBadge(estado: string) {
   switch (estado) {
@@ -187,7 +188,7 @@ export default function ProyectosPage() {
                 <User className="w-4 h-4" /> {p.encargado}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" /> Inicio: {new Date(p.fechaInicio).toLocaleDateString("es-AR")}
+                <Calendar className="w-4 h-4" /> Inicio: {fmtFecha(p.fechaInicio)}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">

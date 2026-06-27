@@ -14,6 +14,7 @@ import {
 import { puedeCargarDocumentos } from "../auth/permisos";
 
 const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
 export default function DocumentacionPage() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
@@ -69,7 +70,7 @@ export default function DocumentacionPage() {
             {docs.length === 0 ? <p className="text-muted-foreground text-sm">Sin documentos cargados.</p> : (
               <div className="space-y-2">{docs.map((d) => (
                 <div key={d.id_documento} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm">
-                  <span className="text-muted-foreground w-24">{new Date(d.fecha_carga).toLocaleDateString("es-AR")}</span>
+                  <span className="text-muted-foreground w-24">{fmtFecha(d.fecha_carga)}</span>
                   <span className="font-medium">{d.nombre}</span><Badge variant="secondary">{d.categoria}</Badge>
                   <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-primary inline-flex items-center gap-1 ml-auto">Abrir <ExternalLink className="w-3 h-3" /></a>
                   {carga && <Button size="sm" variant="ghost" onClick={() => eliminarDocumento(d.id_documento).then(() => setDocs((p) => p.filter((x) => x.id_documento !== d.id_documento))).catch(() => toast.error("Error"))}><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>}
