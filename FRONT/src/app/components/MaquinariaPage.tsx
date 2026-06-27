@@ -6,13 +6,15 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Checkbox } from "./ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Wrench, Plus, Trash2, AlertTriangle, Fuel, Activity, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   listarMaquinaria, crearMaquinaria, eliminarMaquinaria,
   listarRegistrosMaq, crearRegistroMaq, eliminarRegistroMaq,
   listarFallasMaq, crearFallaMaq, eliminarFallaMaq, rendimientoOperarios,
-  type Maquinaria, type RegistroMaquinaria, type FallaMaquinaria, type RendimientoOperario,
+  listarProyectos,
+  type Maquinaria, type RegistroMaquinaria, type FallaMaquinaria, type RendimientoOperario, type Proyecto,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeCargarDocumentos } from "../auth/permisos";
 
@@ -20,6 +22,7 @@ const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default function MaquinariaPage() {
   const [maquinas, setMaquinas] = useState<Maquinaria[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [operarios, setOperarios] = useState<RendimientoOperario[]>([]);
   const [sel, setSel] = useState<Maquinaria | null>(null);
   const [registros, setRegistros] = useState<RegistroMaquinaria[]>([]);
@@ -27,7 +30,7 @@ export default function MaquinariaPage() {
   const [loading, setLoading] = useState(true);
 
   const [formMaq, setFormMaq] = useState({ nombre: "", tipo: "" });
-  const [formReg, setFormReg] = useState({ fecha: hoy(), operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
+  const [formReg, setFormReg] = useState({ fecha: hoy(), id_proyecto: "", operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
   const [formFalla, setFormFalla] = useState({ fecha: hoy(), componente: "", descripcion: "", reemplazo: false });
 
   const gestiona = puedeGestionarObras();
@@ -38,6 +41,7 @@ export default function MaquinariaPage() {
     try {
       setMaquinas(await listarMaquinaria());
       setOperarios(await rendimientoOperarios());
+      listarProyectos().then(setProyectos).catch(() => {});
     } catch {
       toast.error("No se pudo cargar la maquinaria");
     } finally { setLoading(false); }
@@ -74,13 +78,14 @@ export default function MaquinariaPage() {
     try {
       await crearRegistroMaq(sel.id_maquinaria, {
         fecha: formReg.fecha,
+        id_proyecto: formReg.id_proyecto ? parseInt(formReg.id_proyecto, 10) : undefined,
         operario: formReg.operario || undefined,
         horas_uso: parseFloat(formReg.horas_uso) || 0,
         combustible_consumido: parseFloat(formReg.combustible_consumido) || 0,
         produccion_realizada: parseFloat(formReg.produccion_realizada) || 0,
       });
       toast.success("Uso registrado");
-      setFormReg({ fecha: hoy(), operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
+      setFormReg({ fecha: hoy(), id_proyecto: "", operario: "", horas_uso: "", combustible_consumido: "", produccion_realizada: "" });
       await recargarSel();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
   }
@@ -160,6 +165,11 @@ export default function MaquinariaPage() {
               <h4 className="font-semibold">Registro de uso (RF23)</h4>
               {carga && (
                 <form onSubmit={guardarReg} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                  <div className="space-y-1 col-span-2 md:col-span-6"><Label>Obra (opcional)</Label>
+                    <Select value={formReg.id_proyecto} onValueChange={(v) => setFormReg({ ...formReg, id_proyecto: v })}>
+                      <SelectTrigger><SelectValue placeholder="Vincular este uso a una obra (opcional)" /></SelectTrigger>
+                      <SelectContent>{proyectos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}</SelectContent>
+                    </Select></div>
                   <div className="space-y-1"><Label htmlFor="rf">Fecha</Label><Input id="rf" type="date" required value={formReg.fecha} onChange={(e) => setFormReg({ ...formReg, fecha: e.target.value })} /></div>
                   <div className="space-y-1"><Label htmlFor="ro">Operario</Label><Input id="ro" value={formReg.operario} onChange={(e) => setFormReg({ ...formReg, operario: e.target.value })} /></div>
                   <div className="space-y-1"><Label htmlFor="rh">Horas</Label><Input id="rh" type="number" min="0" step="0.1" value={formReg.horas_uso} onChange={(e) => setFormReg({ ...formReg, horas_uso: e.target.value })} /></div>

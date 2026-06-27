@@ -1,291 +1,111 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
-import { Package, Plus, TrendingDown, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Package, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  listarProyectos, listarCatalogoMateriales, listarMaterialesObra,
+  asignarMaterial, eliminarAsignacionMaterial, crearConsumo,
+  type Proyecto, type Material, type AsignacionMaterial,
+} from "../api/proyectos";
+import { puedeGestionarObras, puedeRegistrarAvance } from "../auth/permisos";
 
-interface Material {
-  id: string;
-  nombre: string;
-  unidad: string;
-  stock: number;
-  asignado: number;
-  consumido: number;
-}
+const hoy = () => new Date().toISOString().slice(0, 10);
 
 export default function MaterialesPage() {
-  const [materiales] = useState<Material[]>([
-    { id: "1", nombre: "Cemento Portland", unidad: "bolsas", stock: 500, asignado: 300, consumido: 180 },
-    { id: "2", nombre: "Arena Fina", unidad: "m³", stock: 150, asignado: 80, consumido: 55 },
-    { id: "3", nombre: "Piedra Partida", unidad: "m³", stock: 200, asignado: 120, consumido: 95 },
-    { id: "4", nombre: "Hierro 8mm", unidad: "kg", stock: 3000, asignado: 2000, consumido: 1850 },
-    { id: "5", nombre: "Ladrillo Hueco", unidad: "unidades", stock: 10000, asignado: 6000, consumido: 4200 },
-  ]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [catalogo, setCatalogo] = useState<Material[]>([]);
+  const [obra, setObra] = useState("");
+  const [materiales, setMateriales] = useState<AsignacionMaterial[]>([]);
+  const [formMat, setFormMat] = useState({ id_material: "", cantidad_asignada: "" });
+  const [consumoInput, setConsumoInput] = useState<Record<number, string>>({});
+  const gestiona = puedeGestionarObras();
+  const registra = puedeRegistrarAvance();
 
-  const [consumoData, setConsumoData] = useState({
-    proyecto: "",
-    material: "",
-    cantidad: "",
-    fecha: new Date().toISOString().split('T')[0]
-  });
+  useEffect(() => {
+    listarProyectos().then(setProyectos).catch(() => {});
+    listarCatalogoMateriales().then(setCatalogo).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!obra) { setMateriales([]); return; }
+    listarMaterialesObra(obra).then(setMateriales).catch(() => {});
+  }, [obra]);
 
-  const proyectos = [
-    "Obra Vial Ruta 14",
-    "Edificio Residencial Los Pinos",
-    "Puente Posadas-Encarnación"
-  ];
-
-  const handleRegistrarConsumo = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Consumo de material registrado correctamente");
-    setConsumoData({
-      proyecto: "",
-      material: "",
-      cantidad: "",
-      fecha: new Date().toISOString().split('T')[0]
-    });
-  };
-
-  const getStockStatus = (stock: number, consumido: number) => {
-    const disponible = stock - consumido;
-    const porcentaje = (disponible / stock) * 100;
-    
-    if (porcentaje < 20) return { color: "text-red-600", bg: "bg-secondary", label: "Crítico" };
-    if (porcentaje < 40) return { color: "text-orange-600", bg: "bg-secondary", label: "Bajo" };
-    return { color: "text-green-600", bg: "bg-secondary", label: "Normal" };
-  };
+  async function asignar(e: React.FormEvent) {
+    e.preventDefault(); if (!obra) return;
+    try {
+      await asignarMaterial(obra, { id_material: parseInt(formMat.id_material, 10), cantidad_asignada: parseFloat(formMat.cantidad_asignada) });
+      toast.success("Material asignado"); setFormMat({ id_material: "", cantidad_asignada: "" });
+      setMateriales(await listarMaterialesObra(obra));
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+  }
+  async function registrarConsumo(idAsig: number) {
+    if (!obra) return;
+    const cant = parseFloat(consumoInput[idAsig] ?? "");
+    if (!cant || cant <= 0) { toast.error("Ingresá una cantidad válida"); return; }
+    try {
+      await crearConsumo(idAsig, { fecha: hoy(), cantidad_consumida: cant });
+      toast.success("Consumo registrado"); setConsumoInput((p) => ({ ...p, [idAsig]: "" }));
+      setMateriales(await listarMaterialesObra(obra));
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Gestión de Materiales</h2>
-        <p className="text-muted-foreground mt-2">
-          Asignar materiales y registrar consumo
-        </p>
+        <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><Package className="w-7 h-7" /> Gestión de Materiales</h2>
+        <p className="text-muted-foreground mt-2">Asignación y consumo de materiales por obra (RF10), con alerta de exceso (RF12).</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Summary Cards */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Tipos de Material</p>
-                <p className="text-3xl font-bold text-foreground mt-2">{materiales.length}</p>
-              </div>
-              <div className="bg-secondary p-3 rounded-lg">
-                <Package className="w-6 h-6 " style={{ color: "#3b82f6" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card><CardContent className="pt-6">
+        <Label>Obra</Label>
+        <Select value={obra} onValueChange={setObra}>
+          <SelectTrigger className="mt-2 max-w-md"><SelectValue placeholder="Elegí una obra" /></SelectTrigger>
+          <SelectContent>{proyectos.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}</SelectContent>
+        </Select>
+      </CardContent></Card>
 
+      {!obra ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Seleccioná una obra para gestionar sus materiales.</CardContent></Card>
+      ) : (
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Stock Total</p>
-                <p className="text-3xl font-bold text-foreground mt-2">
-                  {materiales.reduce((acc, m) => acc + m.stock, 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-secondary p-3 rounded-lg">
-                <TrendingDown className="w-6 h-6 " style={{ color: "#22c55e" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Alertas Activas</p>
-                <p className="text-3xl font-bold text-foreground mt-2">
-                  {materiales.filter(m => ((m.stock - m.consumido) / m.stock) < 0.4).length}
-                </p>
-              </div>
-              <div className="bg-secondary p-3 rounded-lg">
-                <AlertTriangle className="w-6 h-6 " style={{ color: "#ef4444" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Registrar Consumo */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Registrar Consumo de Materiales</CardTitle>
-            <CardDescription>
-              Controlar los materiales efectivamente utilizados
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleRegistrarConsumo} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="proyecto-consumo">Proyecto</Label>
-                <Select 
-                  value={consumoData.proyecto} 
-                  onValueChange={(value) => setConsumoData({...consumoData, proyecto: value})}
-                  required
-                >
-                  <SelectTrigger id="proyecto-consumo">
-                    <SelectValue placeholder="Seleccionar proyecto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {proyectos.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="material">Material</Label>
-                <Select 
-                  value={consumoData.material} 
-                  onValueChange={(value) => setConsumoData({...consumoData, material: value})}
-                  required
-                >
-                  <SelectTrigger id="material">
-                    <SelectValue placeholder="Seleccionar material" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materiales.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cantidad-consumo">Cantidad Consumida</Label>
-                <Input
-                  id="cantidad-consumo"
-                  type="number"
-                  value={consumoData.cantidad}
-                  onChange={(e) => setConsumoData({...consumoData, cantidad: e.target.value})}
-                  placeholder="0"
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fecha-consumo">Fecha</Label>
-                <Input
-                  id="fecha-consumo"
-                  type="date"
-                  value={consumoData.fecha}
-                  onChange={(e) => setConsumoData({...consumoData, fecha: e.target.value})}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Registrar Consumo
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Asignar Materiales */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Asignar Materiales a Obra</CardTitle>
-            <CardDescription>
-              Asociar materiales específicos a cada proyecto
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Permite controlar los recursos disponibles y utilizados en cada proyecto.
-              </p>
-              <Button className="w-full gap-2">
-                <Plus className="w-4 h-4" />
-                Asignar Materiales
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Inventario de Materiales */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventario de Materiales</CardTitle>
-          <CardDescription>
-            Consultar materiales disponibles y utilizados
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {materiales.map((material) => {
-              const disponible = material.stock - material.consumido;
-              const porcentajeConsumido = ((material.consumido / material.asignado) * 100).toFixed(0);
-              const status = getStockStatus(material.stock, material.consumido);
-              
-              return (
-                <div key={material.id} className="p-4 border rounded-lg space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-semibold text-foreground">{material.nombre}</h4>
-                        <Badge className={`${status.bg} ${status.color} border-0`}>
-                          {status.label}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">Unidad: {material.unidad}</p>
-                    </div>
+          <CardHeader><CardTitle>Materiales de la obra</CardTitle><CardDescription>Asignado vs. consumido. Se avisa si se excede.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            {gestiona && (
+              <form onSubmit={asignar} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div className="space-y-2"><Label>Material</Label>
+                  <Select value={formMat.id_material} onValueChange={(v) => setFormMat({ ...formMat, id_material: v })}><SelectTrigger><SelectValue placeholder="Elegí un material" /></SelectTrigger>
+                    <SelectContent>{catalogo.map((m) => <SelectItem key={m.id_material} value={String(m.id_material)}>{m.nombre} ({m.unidad})</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Cantidad asignada</Label><Input type="number" min="0" step="0.01" required value={formMat.cantidad_asignada} onChange={(e) => setFormMat({ ...formMat, cantidad_asignada: e.target.value })} /></div>
+                <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Asignar material</Button>
+              </form>
+            )}
+            {materiales.length === 0 ? <p className="text-muted-foreground text-sm">Sin materiales asignados.</p> : (
+              <div className="space-y-2">{materiales.map((m) => (
+                <div key={m.id_asignacion} className="border rounded-md px-4 py-3 text-sm space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-medium">{m.nombre}</span>
+                    <span className="text-muted-foreground">{m.consumido} / {m.cantidad_asignada} {m.unidad} · restante {m.restante} {m.unidad}</span>
+                    {m.excedido && <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Excedido</Badge>}
+                    {gestiona && <Button size="sm" variant="ghost" className="ml-auto" onClick={() => eliminarAsignacionMaterial(m.id_asignacion).then(() => listarMaterialesObra(obra).then(setMateriales)).catch(() => toast.error("Error"))}><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>}
                   </div>
-                  
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Stock Total</p>
-                      <p className="font-semibold text-foreground">{material.stock}</p>
+                  <div className="w-full bg-gray-200 rounded-full h-2"><div className="h-2 rounded-full" style={{ width: `${Math.min(100, m.cantidad_asignada > 0 ? (m.consumido / m.cantidad_asignada) * 100 : 0)}%`, background: m.excedido ? "#ef4444" : "#3b82f6" }} /></div>
+                  {registra && (
+                    <div className="flex items-end gap-2 pt-1">
+                      <Input type="number" min="0" step="0.01" placeholder={`Consumo (${m.unidad})`} value={consumoInput[m.id_asignacion] ?? ""} onChange={(e) => setConsumoInput((p) => ({ ...p, [m.id_asignacion]: e.target.value }))} className="max-w-[220px]" />
+                      <Button size="sm" type="button" onClick={() => registrarConsumo(m.id_asignacion)} className="gap-1"><Plus className="w-4 h-4" /> Registrar consumo</Button>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Asignado</p>
-                      <p className="font-semibold text-foreground">{material.asignado}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Consumido</p>
-                      <p className="font-semibold text-foreground">{material.consumido}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Disponible</p>
-                      <p className="font-semibold text-foreground">{disponible}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Uso del material asignado</span>
-                      <span className="font-semibold">{porcentajeConsumido}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full transition-all ${
-                          parseInt(porcentajeConsumido) > 90 ? 'bg-red-600' :
-                          parseInt(porcentajeConsumido) > 70 ? 'bg-orange-600' :
-                          'bg-blue-600'
-                        }`}
-                        style={{ width: `${Math.min(parseInt(porcentajeConsumido), 100)}%` }}
-                      />
-                    </div>
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}</div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
