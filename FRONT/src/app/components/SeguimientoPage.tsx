@@ -17,7 +17,7 @@ import {
 } from "../api/proyectos";
 import { puedeRegistrarAvance } from "../auth/permisos";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const ESTADO_ASIS: Record<EstadoAsistencia, { label: string; color: string }> = {
   presente: { label: "Presente", color: "#22c55e" }, ausente: { label: "Ausente", color: "#ef4444" }, tarde: { label: "Tarde", color: "#e8981e" },
 };

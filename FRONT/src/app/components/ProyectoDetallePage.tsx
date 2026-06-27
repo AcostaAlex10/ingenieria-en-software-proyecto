@@ -27,7 +27,9 @@ import {
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos, puedeVerCostos } from "../auth/permisos";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+// Fecha de HOY en zona horaria LOCAL (no UTC), para que de noche en Argentina
+// no muestre el día siguiente.
+const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 // Etiquetas y colores para mostrar asistencia e incidencias.
 const ESTADO_ASIS: Record<EstadoAsistencia, { label: string; color: string }> = {

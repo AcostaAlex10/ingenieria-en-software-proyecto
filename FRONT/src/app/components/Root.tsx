@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { getUsuario, clearSession } from "../auth/session";
 import { apiFetch } from "../auth/api";
+import { obtenerAnalisis } from "../api/proyectos";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, abbr: "DSH" },
@@ -58,9 +59,21 @@ export default function Root() {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
 
   // Usuario de la sesion actual (guardado al iniciar sesion).
   const usuario = getUsuario();
+
+  // Cantidad real de alertas activas para el badge del menu (RF11/RF12).
+  useEffect(() => {
+    let vivo = true;
+    function refrescar() {
+      obtenerAnalisis().then((a) => { if (vivo) setAlertCount(a.alertas.length); }).catch(() => {});
+    }
+    refrescar();
+    const t = setInterval(refrescar, 60000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [location.pathname]);
 
   // Sesion unica: chequeamos contra el backend si nuestra sesion sigue activa.
   // Si alguien inicio sesion con la misma cuenta en otro lado, /auth/me devuelve
@@ -186,7 +199,7 @@ export default function Root() {
                 >
                   {item.label}
                 </span>
-                {item.alert && (
+                {item.alert && alertCount > 0 && (
                   <span
                     style={{
                       fontSize: "10px",
@@ -198,7 +211,7 @@ export default function Root() {
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
                   >
-                    3
+                    {alertCount}
                   </span>
                 )}
                 {active && <ChevronRight style={{ width: "12px", height: "12px", color: "var(--primary)", flexShrink: 0 }} />}

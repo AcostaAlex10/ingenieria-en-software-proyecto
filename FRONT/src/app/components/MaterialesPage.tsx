@@ -14,7 +14,7 @@ import {
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeRegistrarAvance } from "../auth/permisos";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+const hoy = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
 export default function MaterialesPage() {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
