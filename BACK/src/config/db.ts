@@ -17,4 +17,8 @@ export const pool = mysql.createPool({
   ssl,
   waitForConnections: true,
   connectionLimit: 10,
+  // Devolver las columnas DATE/DATETIME como string 'YYYY-MM-DD' en vez de
+  // objetos Date (que se serializan con hora/UTC). El frontend espera fechas
+  // planas, igual que las devolvia el backend PHP original.
+  dateStrings: true,
 });

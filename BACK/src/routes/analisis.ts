@@ -47,12 +47,17 @@ router.get('/', async (req, res, next) => {
     }
     const esperadosPorPlan = await calcularEsperadoBatch(planIds, fallbacks);
 
-    // Materiales excedidos por proyecto (RF12)
+    // Materiales excedidos por proyecto (RF12): el consumo acumulado supera lo asignado.
     const [excRows] = await pool.query(`
-      SELECT om.id_proyecto, COUNT(*) AS cantidad
-      FROM asignacion_material om
-      WHERE om.cantidad_consumida > om.cantidad_asignada
-      GROUP BY om.id_proyecto
+      SELECT t.id_proyecto, COUNT(*) AS cantidad FROM (
+        SELECT am.id_proyecto, am.cantidad_asignada,
+               COALESCE(SUM(cm.cantidad_consumida), 0) AS consumido
+        FROM asignacion_material am
+        LEFT JOIN consumo_material cm ON cm.id_asignacion = am.id_asignacion
+        GROUP BY am.id_asignacion, am.id_proyecto, am.cantidad_asignada
+      ) t
+      WHERE t.consumido > t.cantidad_asignada
+      GROUP BY t.id_proyecto
     `).catch(() => [[]] as [unknown[]]);
     const excedidosPorProyecto: Record<number, number> = {};
     for (const r of excRows as { id_proyecto: number; cantidad: number }[]) {
