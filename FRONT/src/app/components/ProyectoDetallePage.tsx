@@ -7,11 +7,12 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers, Wallet } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers, Wallet, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
   listarAvances, resumenAvances, crearAvance,
+  listarEtapas, crearEtapa, actualizarEtapa, eliminarEtapa,
   listarAsistencias, crearAsistencia, eliminarAsistencia,
   listarIncidencias, crearIncidencia, eliminarIncidencia,
   listarCatalogoMateriales, listarMaterialesObra, asignarMaterial,
@@ -20,6 +21,7 @@ import {
   listarInactividades, crearInactividad, eliminarInactividad,
   listarExcedentes, crearExcedente, eliminarExcedente,
   type Proyecto, type Planificacion, type Avance, type Resumen,
+  type EtapaPlanificacion,
   type Asistencia, type Incidencia, type EstadoAsistencia,
   type TipoIncidencia, type GravedadIncidencia,
   type Material, type AsignacionMaterial, type Documento, type TipoDocumento,
@@ -66,8 +68,13 @@ export default function ProyectoDetallePage() {
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [formPlan, setFormPlan] = useState({ avance_esperado_total: "", fecha_carga: hoy() });
   const [formAvance, setFormAvance] = useState({ cantidad_ejecutada: "", porcentaje_avance: "", fecha: hoy(), observaciones: "" });
+
+  // Etapas de planificación
+  const [etapas, setEtapas] = useState<EtapaPlanificacion[]>([]);
+  const [formEtapa, setFormEtapa] = useState({ nombre: "", peso_porcentual: "", fecha_inicio: hoy(), fecha_fin: "", presupuesto_base: "" });
+  const [editandoEtapa, setEditandoEtapa] = useState<number | null>(null);
+  const [formEditEtapa, setFormEditEtapa] = useState({ nombre: "", peso_porcentual: "", fecha_inicio: "", fecha_fin: "", presupuesto_base: "" });
 
   // Seguimiento operativo (Sprint 2): asistencia (RF06) e incidencias (RF09).
   const [asistencias, setAsistencias] = useState<Asistencia[]>([]);
@@ -122,15 +129,18 @@ export default function ProyectoDetallePage() {
       // El catálogo de materiales no bloquea la carga de la obra.
       if (catalogo.length === 0) listarCatalogoMateriales().then(setCatalogo).catch(() => {});
       if (planif) {
-        const [av, res] = await Promise.all([
+        const [av, res, etas] = await Promise.all([
           listarAvances(planif.id_planificacion),
           resumenAvances(planif.id_planificacion),
+          listarEtapas(planif.id_planificacion),
         ]);
         setAvances(av);
         setResumen(res);
+        setEtapas(etas);
       } else {
         setAvances([]);
         setResumen(null);
+        setEtapas([]);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo cargar la obra");
@@ -140,18 +150,76 @@ export default function ProyectoDetallePage() {
   }, [id]);
   useEffect(() => { cargar(); }, [cargar]);
 
-  async function guardarPlan(e: React.FormEvent) {
-    e.preventDefault();
+  async function guardarPlan() {
     if (!id) return;
     try {
-      await crearPlanificacion(id, {
-        avance_esperado_total: parseFloat(formPlan.avance_esperado_total),
-        fecha_carga: formPlan.fecha_carga,
-      });
-      toast.success("Planificación creada");
+      await crearPlanificacion(id, { fecha_carga: hoy() });
+      toast.success("Planificación creada. Ahora podés agregar las etapas.");
       await cargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al crear la planificación");
+    }
+  }
+
+  // --- Etapas de planificación ---
+  async function guardarEtapa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!plan) return;
+    try {
+      await crearEtapa(plan.id_planificacion, {
+        nombre: formEtapa.nombre,
+        peso_porcentual: parseFloat(formEtapa.peso_porcentual),
+        fecha_inicio: formEtapa.fecha_inicio,
+        fecha_fin: formEtapa.fecha_fin,
+        presupuesto_base: formEtapa.presupuesto_base ? parseFloat(formEtapa.presupuesto_base) : 0,
+      });
+      toast.success("Etapa agregada");
+      setFormEtapa({ nombre: "", peso_porcentual: "", fecha_inicio: hoy(), fecha_fin: "", presupuesto_base: "" });
+      const [etas, res] = await Promise.all([
+        listarEtapas(plan.id_planificacion),
+        resumenAvances(plan.id_planificacion),
+      ]);
+      setEtapas(etas);
+      setResumen(res);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al agregar la etapa");
+    }
+  }
+  async function guardarEditEtapa(e: React.FormEvent, idEtapa: number) {
+    e.preventDefault();
+    if (!plan) return;
+    try {
+      await actualizarEtapa(idEtapa, {
+        nombre: formEditEtapa.nombre,
+        peso_porcentual: parseFloat(formEditEtapa.peso_porcentual),
+        fecha_inicio: formEditEtapa.fecha_inicio,
+        fecha_fin: formEditEtapa.fecha_fin,
+        presupuesto_base: formEditEtapa.presupuesto_base ? parseFloat(formEditEtapa.presupuesto_base) : 0,
+      });
+      toast.success("Etapa actualizada");
+      setEditandoEtapa(null);
+      const [etas, res] = await Promise.all([
+        listarEtapas(plan.id_planificacion),
+        resumenAvances(plan.id_planificacion),
+      ]);
+      setEtapas(etas);
+      setResumen(res);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al actualizar la etapa");
+    }
+  }
+  async function borrarEtapa(idEtapa: number) {
+    if (!plan) return;
+    try {
+      await eliminarEtapa(idEtapa);
+      const [etas, res] = await Promise.all([
+        listarEtapas(plan.id_planificacion),
+        resumenAvances(plan.id_planificacion),
+      ]);
+      setEtapas(etas);
+      setResumen(res);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar la etapa");
     }
   }
 
@@ -392,54 +460,192 @@ export default function ProyectoDetallePage() {
       </Card>
 
       {/* Planificacion (RF02) */}
-      {!plan ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Planificación de la obra</CardTitle>
-            <CardDescription>
-              {gestiona
-                ? "Esta obra todavía no tiene planificación. Cargá el avance esperado total."
-                : "Esta obra todavía no tiene planificación cargada."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!gestiona ? (
-              <p className="text-muted-foreground text-sm">Solo el personal administrativo puede cargar la planificación.</p>
-            ) : (
-            <form onSubmit={guardarPlan} className="flex flex-wrap items-end gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="aet">Avance esperado total (%)</Label>
-                <Input id="aet" type="number" min="0" max="100" step="0.01" required
-                  value={formPlan.avance_esperado_total}
-                  onChange={(e) => setFormPlan({ ...formPlan, avance_esperado_total: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fc">Fecha de carga</Label>
-                <Input id="fc" type="date" required value={formPlan.fecha_carga}
-                  onChange={(e) => setFormPlan({ ...formPlan, fecha_carga: e.target.value })} />
-              </div>
-              <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Crear planificación</Button>
-            </form>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Resumen avance esperado vs real */}
-          {resumen && (
+      {(() => {
+        const sumaEtapas = etapas.reduce((acc, e) => acc + e.peso_porcentual, 0);
+        const sumaPct = Math.round(sumaEtapas * 100) / 100;
+        return !plan ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Planificación de la obra</CardTitle>
+              <CardDescription>
+                {gestiona
+                  ? "Esta obra todavía no tiene planificación. Creá una para poder cargar etapas y avances."
+                  : "Esta obra todavía no tiene planificación cargada."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!gestiona ? (
+                <p className="text-muted-foreground text-sm">Solo el personal administrativo puede cargar la planificación.</p>
+              ) : (
+                <Button onClick={guardarPlan} className="gap-2"><Plus className="w-4 h-4" /> Crear planificación</Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Etapas de planificación */}
+            {gestiona && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Seguimiento de avance</CardTitle>
-                <CardDescription>Comparación entre lo planificado y lo ejecutado.</CardDescription>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5" /> Etapas planificadas
+                  </CardTitle>
+                  <Badge style={{
+                    background: sumaPct === 100 ? "#22c55e" : sumaPct > 100 ? "#ef4444" : "#e8981e",
+                    color: "#fff",
+                  }}>
+                    {sumaPct === 100 ? "✓ 100%" : `${sumaPct}% / 100%`}
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Cada etapa aporta un peso al avance total y define un rango de fechas. La suma de pesos debe ser 100%.
+                  El esperado de hoy se calcula automáticamente según el progreso temporal de cada etapa.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Metric label="Avance esperado" value={`${resumen.avance_esperado}%`} />
-                <Metric label="Avance real" value={`${resumen.avance_real}%`} />
-                <Metric label="Desvío" value={`${resumen.desvio_pp} pp`} color={resumen.desvio_pp < 0 ? "#ef4444" : "#22c55e"} />
-                <Metric label="Registros" value={String(resumen.total_registros)} />
+              <CardContent className="space-y-3">
+                {etapas.length === 0 && (
+                  <p className="text-muted-foreground text-sm">Todavía no hay etapas cargadas. Agregá etapas para que el esperado se calcule por fecha.</p>
+                )}
+                {etapas.map((e) =>
+                  editandoEtapa === e.id_etapa ? (
+                    <form
+                      key={e.id_etapa}
+                      onSubmit={(ev) => guardarEditEtapa(ev, e.id_etapa)}
+                      className="border rounded-md px-4 py-3 grid grid-cols-1 md:grid-cols-5 gap-2 items-end"
+                    >
+                      <div className="space-y-1">
+                        <Label>Nombre</Label>
+                        <Input required value={formEditEtapa.nombre}
+                          onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, nombre: ev.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Peso (%)</Label>
+                        <Input type="number" min="0" max="100" step="0.01" required
+                          value={formEditEtapa.peso_porcentual}
+                          onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, peso_porcentual: ev.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Inicio</Label>
+                        <Input type="date" required value={formEditEtapa.fecha_inicio}
+                          onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, fecha_inicio: ev.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Fin</Label>
+                        <Input type="date" required value={formEditEtapa.fecha_fin}
+                          onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, fecha_fin: ev.target.value })} />
+                      </div>
+                      {verCostos && (
+                        <div className="space-y-1">
+                          <Label>Presup. base ($)</Label>
+                          <Input type="number" min="0" step="0.01" value={formEditEtapa.presupuesto_base}
+                            onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, presupuesto_base: ev.target.value })} placeholder="0" />
+                        </div>
+                      )}
+                      <div className="flex gap-2 md:col-span-5">
+                        <Button type="submit" size="sm">Guardar</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setEditandoEtapa(null)}>Cancelar</Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div key={e.id_etapa} className="flex items-center gap-3 border rounded-md px-4 py-2 text-sm flex-wrap">
+                      <span className="font-medium">{e.nombre}</span>
+                      <Badge variant="secondary">{e.peso_porcentual}%</Badge>
+                      <span className="text-muted-foreground">{fmtFecha(e.fecha_inicio)} → {fmtFecha(e.fecha_fin)}</span>
+                      {verCostos && e.presupuesto_base > 0 && (
+                        <span className="text-muted-foreground">${e.presupuesto_base.toLocaleString("es-AR")}</span>
+                      )}
+                      <div className="ml-auto flex gap-1">
+                        <Button size="sm" variant="ghost" title="Editar" onClick={() => {
+                          setEditandoEtapa(e.id_etapa);
+                          setFormEditEtapa({ nombre: e.nombre, peso_porcentual: String(e.peso_porcentual), fecha_inicio: e.fecha_inicio, fecha_fin: e.fecha_fin, presupuesto_base: String(e.presupuesto_base) });
+                        }}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" title="Eliminar" onClick={() => borrarEtapa(e.id_etapa)}>
+                          <Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
+                {/* Totales de presupuesto base (solo visibles para quien puede ver costos) */}
+                {verCostos && etapas.length > 0 && (() => {
+                  const totalBase = etapas.reduce((a, e) => a + e.presupuesto_base, 0);
+                  if (totalBase === 0) return null;
+                  const ejecutadoEst = proyecto ? Math.round((proyecto.presupuesto * (resumen?.avance_real ?? 0)) / 100) : 0;
+                  return (
+                    <div className="flex gap-6 text-sm pt-1 border-t">
+                      <span>Presup. base total: <b>${totalBase.toLocaleString("es-AR")}</b></span>
+                      <span>Ejecutado estimado: <b>${ejecutadoEst.toLocaleString("es-AR")}</b></span>
+                      <span style={{ color: totalBase - ejecutadoEst >= 0 ? "#22c55e" : "#ef4444" }}>
+                        Diferencia base: <b>${(totalBase - ejecutadoEst).toLocaleString("es-AR")}</b>
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Formulario para agregar nueva etapa */}
+                <form onSubmit={guardarEtapa} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end pt-3 border-t">
+                  <div className="space-y-1">
+                    <Label htmlFor="en">Nueva etapa</Label>
+                    <Input id="en" placeholder="Ej: Cimientos" required value={formEtapa.nombre}
+                      onChange={(e) => setFormEtapa({ ...formEtapa, nombre: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="ep">Peso (%)</Label>
+                    <Input id="ep" type="number" min="0" max="100" step="0.01" required placeholder="Ej: 30"
+                      value={formEtapa.peso_porcentual}
+                      onChange={(e) => setFormEtapa({ ...formEtapa, peso_porcentual: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="efi">Inicio</Label>
+                    <Input id="efi" type="date" required value={formEtapa.fecha_inicio}
+                      onChange={(e) => setFormEtapa({ ...formEtapa, fecha_inicio: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="eff">Fin</Label>
+                    <Input id="eff" type="date" required value={formEtapa.fecha_fin}
+                      onChange={(e) => setFormEtapa({ ...formEtapa, fecha_fin: e.target.value })} />
+                  </div>
+                  {verCostos && (
+                    <div className="space-y-1">
+                      <Label htmlFor="epb">Presup. base ($)</Label>
+                      <Input id="epb" type="number" min="0" step="0.01" placeholder="0"
+                        value={formEtapa.presupuesto_base}
+                        onChange={(e) => setFormEtapa({ ...formEtapa, presupuesto_base: e.target.value })} />
+                    </div>
+                  )}
+                  <div className={verCostos ? "md:col-span-5" : "md:col-span-4"}>
+                    <Button type="submit" className="gap-2"><Plus className="w-4 h-4" /> Agregar etapa</Button>
+                    {sumaPct > 0 && sumaPct < 100 && (
+                      <span className="ml-3 text-sm" style={{ color: "#e8981e" }}>
+                        Quedan {Math.round((100 - sumaPct) * 100) / 100}% por asignar
+                      </span>
+                    )}
+                  </div>
+                </form>
               </CardContent>
             </Card>
-          )}
+            )}
+
+            {/* Resumen avance esperado vs real */}
+            {resumen && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5" /> Seguimiento de avance</CardTitle>
+                  <CardDescription>
+                    Comparación entre lo planificado (calculado a la fecha según etapas) y lo ejecutado.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Metric label="Esperado hoy" value={`${resumen.avance_esperado}%`} />
+                  <Metric label="Avance real" value={`${resumen.avance_real}%`} />
+                  <Metric label="Desvío" value={`${resumen.desvio_pp} pp`} color={resumen.desvio_pp < 0 ? "#ef4444" : "#22c55e"} />
+                  <Metric label="Registros" value={String(resumen.total_registros)} />
+                </CardContent>
+              </Card>
+            )}
 
           {/* Cargar avance (solo el encargado de obra / Personal Técnico) */}
           {registraAvance && (
@@ -495,7 +701,8 @@ export default function ProyectoDetallePage() {
             </CardContent>
           </Card>
         </>
-      )}
+        );
+      })()}
 
       {/* Asistencia del personal (RF06) */}
       <Card>

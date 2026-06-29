@@ -89,22 +89,41 @@ export default function AlertasPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Presupuesto vs. ejecutado (RF13)</CardTitle>
-            <CardDescription>Gasto ejecutado estimado según el avance físico de cada obra.</CardDescription>
+            <CardDescription>
+              Gasto ejecutado estimado según el avance físico. "Base plan." es la suma del presupuesto base de las etapas planificadas.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="grid text-xs text-muted-foreground uppercase" style={{ gridTemplateColumns: "1fr 150px 150px 150px" }}>
-                <span>Obra</span><span>Presupuesto</span><span>Ejecutado</span><span>Diferencia</span>
-              </div>
-              {data.proyectos.map((p) => (
-                <div key={p.id_proyecto} className="grid items-center text-sm border-t py-2" style={{ gridTemplateColumns: "1fr 150px 150px 150px" }}>
-                  <span className="font-medium">{p.nombre}</span>
-                  <span className="mono">{pesos(p.presupuesto ?? 0)}</span>
-                  <span className="mono">{pesos(p.ejecutado ?? 0)}</span>
-                  <span className="mono" style={{ color: (p.diferencia ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>{pesos(p.diferencia ?? 0)}</span>
+            {(() => {
+              const mostrarBase = data.proyectos.some((p) => (p.presupuesto_base_total ?? 0) > 0);
+              const cols = mostrarBase ? "1fr 140px 140px 140px 140px" : "1fr 150px 150px 150px";
+              return (
+                <div className="space-y-2">
+                  <div className="grid text-xs text-muted-foreground uppercase" style={{ gridTemplateColumns: cols }}>
+                    <span>Obra</span>
+                    <span>Presupuesto</span>
+                    {mostrarBase && <span>Base plan.</span>}
+                    <span>Ejecutado</span>
+                    <span>Diferencia</span>
+                  </div>
+                  {data.proyectos.map((p) => (
+                    <div key={p.id_proyecto} className="grid items-center text-sm border-t py-2" style={{ gridTemplateColumns: cols }}>
+                      <span className="font-medium">{p.nombre}</span>
+                      <span className="mono">{pesos(p.presupuesto ?? 0)}</span>
+                      {mostrarBase && (
+                        <span className="mono text-muted-foreground">
+                          {(p.presupuesto_base_total ?? 0) > 0 ? pesos(p.presupuesto_base_total!) : "—"}
+                        </span>
+                      )}
+                      <span className="mono">{pesos(p.ejecutado ?? 0)}</span>
+                      <span className="mono" style={{ color: (p.diferencia ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                        {pesos(p.diferencia ?? 0)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}

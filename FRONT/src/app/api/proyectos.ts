@@ -24,6 +24,17 @@ export interface Planificacion {
   id_proyecto: number;
 }
 
+export interface EtapaPlanificacion {
+  id_etapa: number;
+  id_planificacion: number;
+  nombre: string;
+  peso_porcentual: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  orden: number;
+  presupuesto_base: number;
+}
+
 export interface Avance {
   id_avance: number;
   id_planificacion: number;
@@ -169,9 +180,29 @@ export async function obtenerPlanificacion(idProyecto: string): Promise<Planific
 }
 export async function crearPlanificacion(
   idProyecto: string,
-  datos: { avance_esperado_total: number; fecha_carga: string }
+  datos: { avance_esperado_total?: number; fecha_carga: string }
 ): Promise<Planificacion> {
   return parse(await apiFetch(`/proyectos/${idProyecto}/planificacion`, { method: "POST", body: JSON.stringify(datos) }));
+}
+
+// ---------- Etapas de planificación ----------
+export async function listarEtapas(idPlan: number): Promise<EtapaPlanificacion[]> {
+  return parse(await apiFetch(`/planificacion/${idPlan}/etapas`));
+}
+export async function crearEtapa(
+  idPlan: number,
+  datos: { nombre: string; peso_porcentual: number; fecha_inicio: string; fecha_fin: string; presupuesto_base?: number; orden?: number }
+): Promise<EtapaPlanificacion & { suma_pesos: number }> {
+  return parse(await apiFetch(`/planificacion/${idPlan}/etapas`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function actualizarEtapa(
+  id: number,
+  datos: { nombre?: string; peso_porcentual?: number; fecha_inicio?: string; fecha_fin?: string; presupuesto_base?: number; orden?: number }
+): Promise<void> {
+  await parse(await apiFetch(`/planificacion/etapa/${id}`, { method: "PUT", body: JSON.stringify(datos) }));
+}
+export async function eliminarEtapa(id: number): Promise<void> {
+  await parse(await apiFetch(`/planificacion/etapa/${id}`, { method: "DELETE" }));
 }
 export async function actualizarPlanificacion(
   idPlan: number,
@@ -330,6 +361,7 @@ export interface AnalisisProyecto {
   presupuesto?: number;
   ejecutado?: number;
   diferencia?: number;
+  presupuesto_base_total?: number | null;
 }
 export interface Alerta {
   tipo: "avance" | "material";
