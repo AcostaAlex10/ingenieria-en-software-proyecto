@@ -6,7 +6,7 @@ const router = Router();
 
 const CAMPOS_PERMITIDOS = [
   'nombre', 'ubicacion', 'tipo', 'fecha_inicio',
-  'fecha_fin', 'presupuesto_estimado', 'estado', 'id_responsable',
+  'presupuesto', 'estado', 'encargado',
 ] as const;
 
 const ProyectoSchema = z.object({
@@ -14,20 +14,16 @@ const ProyectoSchema = z.object({
   ubicacion: z.string().min(1),
   tipo: z.string().min(1),
   fecha_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato esperado: YYYY-MM-DD'),
-  fecha_fin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  presupuesto_estimado: z.number().positive(),
-  id_responsable: z.number().int().positive(),
+  presupuesto: z.number().positive(),
+  encargado: z.string().min(1),
 });
 
 // GET /api/proyectos
 router.get('/', async (_req, res, next) => {
   try {
-    const [rows] = await pool.query(`
-      SELECT p.*, u.nombre AS encargado
-      FROM proyecto p
-      LEFT JOIN usuario u ON p.id_responsable = u.id_usuario
-      ORDER BY p.fecha_inicio DESC
-    `);
+    const [rows] = await pool.query(
+      'SELECT * FROM proyecto ORDER BY fecha_inicio DESC'
+    );
     res.json(rows);
   } catch (err) {
     next(err);
@@ -54,14 +50,9 @@ router.post('/', async (req, res, next) => {
   try {
     const data = ProyectoSchema.parse(req.body);
     const [result] = await pool.query(
-      `INSERT INTO proyecto
-        (nombre, ubicacion, tipo, fecha_inicio, fecha_fin, presupuesto_estimado, estado, id_responsable)
-       VALUES (?, ?, ?, ?, ?, ?, 'Creado', ?)`,
-      [
-        data.nombre, data.ubicacion, data.tipo,
-        data.fecha_inicio, data.fecha_fin ?? null,
-        data.presupuesto_estimado, data.id_responsable,
-      ]
+      `INSERT INTO proyecto (nombre, ubicacion, tipo, fecha_inicio, presupuesto, estado, encargado)
+       VALUES (?, ?, ?, ?, ?, 'Creado', ?)`,
+      [data.nombre, data.ubicacion, data.tipo, data.fecha_inicio, data.presupuesto, data.encargado]
     );
     const id = (result as { insertId: number }).insertId;
     res.status(201).json({ id_proyecto: id, estado: 'Creado', ...data });
