@@ -1,0 +1,8 @@
+# Datos "vivos" del repositorio JSON temporal: se regenera a partir
+# de proyectos.seed.json, no tiene sentido versionarlo (cada uno va a
+# tener proyectos de prueba distintos creados/borrados localmente).
+data/proyectos.json
+
+# Cuando agreguemos Composer o variables de entorno:
+/vendor/
+.env

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "1",
+    "nombre": "Obra Vial Ruta 14",
+    "tipo": "Infraestructura Vial",
+    "ubicacion": "Posadas, Misiones",
+    "encargado": "Ing. Roberto Suénaga",
+    "fechaInicio": "2026-01-15",
+    "estado": "en_ejecucion",
+    "avance": 65,
+    "presupuesto": 15000000
+  },
+  {
+    "id": "2",
+    "nombre": "Edificio Residencial Los Pinos",
+    "tipo": "Construcción Edilicia",
+    "ubicacion": "Oberá, Misiones",
+    "encargado": "Arq. Nancy Ganz",
+    "fechaInicio": "2025-11-20",
+    "estado": "en_ejecucion",
+    "avance": 45,
+    "presupuesto": 8500000
+  },
+  {
+    "id": "3",
+    "nombre": "Puente Posadas-Encarnación",
+    "tipo": "Infraestructura Vial",
+    "ubicacion": "Posadas, Misiones",
+    "encargado": "Ing. Briant Gauna",
+    "fechaInicio": "2025-09-01",
+    "estado": "en_ejecucion",
+    "avance": 78,
+    "presupuesto": 25000000
+  }
+]
