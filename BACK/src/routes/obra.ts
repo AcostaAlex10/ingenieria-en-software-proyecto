@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_AVANCE, ROLES_DOC, ROLES_GESTION_OBRA } from '../middleware/roles';
 
 // Rutas anidadas bajo una obra: asistencias, incidencias, documentos,
 // inactividades, excedentes y materiales asignados (con sus consumos).
@@ -27,7 +29,7 @@ router.get('/:id/asistencias', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/asistencias', async (req, res, next) => {
+router.post('/:id/asistencias', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     const data = AsistenciaSchema.parse(req.body);
     const just = data.justificacion?.trim() ? data.justificacion.trim() : null;
@@ -40,7 +42,7 @@ router.post('/:id/asistencias', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/asistencia/:id', async (req, res, next) => {
+router.delete('/asistencia/:id', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM asistencia WHERE id_asistencia = ?', [req.params.id]);
     res.status(204).send();
@@ -66,7 +68,7 @@ router.get('/:id/incidencias', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/incidencias', async (req, res, next) => {
+router.post('/:id/incidencias', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     const data = IncidenciaSchema.parse(req.body);
     const dias = data.dias_retraso ?? 0;
@@ -79,7 +81,7 @@ router.post('/:id/incidencias', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/incidencia/:id', async (req, res, next) => {
+router.delete('/incidencia/:id', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM incidencia WHERE id_incidencia = ?', [req.params.id]);
     res.status(204).send();
@@ -105,7 +107,7 @@ router.get('/:id/documentos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/documentos', async (req, res, next) => {
+router.post('/:id/documentos', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const data = DocumentoSchema.parse(req.body);
     const [result] = await pool.query(
@@ -117,7 +119,7 @@ router.post('/:id/documentos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/documento/:id', async (req, res, next) => {
+router.delete('/documento/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM documento WHERE id_documento = ?', [req.params.id]);
     res.status(204).send();
@@ -141,7 +143,7 @@ router.get('/:id/inactividades', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/inactividades', async (req, res, next) => {
+router.post('/:id/inactividades', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const data = InactividadSchema.parse(req.body);
     const fin = data.fecha_fin ?? null;
@@ -154,7 +156,7 @@ router.post('/:id/inactividades', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/inactividad/:id', async (req, res, next) => {
+router.delete('/inactividad/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM periodo_inactividad WHERE id_periodo = ?', [req.params.id]);
     res.status(204).send();
@@ -180,7 +182,7 @@ router.get('/:id/excedentes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:id/excedentes', async (req, res, next) => {
+router.post('/:id/excedentes', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const data = ExcedenteSchema.parse(req.body);
     const cantidad = data.cantidad ?? null;
@@ -195,7 +197,7 @@ router.post('/:id/excedentes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/excedente/:id', async (req, res, next) => {
+router.delete('/excedente/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM item_excedente WHERE id_item = ?', [req.params.id]);
     res.status(204).send();
@@ -239,7 +241,7 @@ const AsignarMaterialSchema = z.object({
   cantidad_asignada: z.number().positive(),
 });
 
-router.post('/:id/materiales', async (req, res, next) => {
+router.post('/:id/materiales', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const [proy] = await pool.query('SELECT id_proyecto FROM proyecto WHERE id_proyecto = ?', [req.params.id]);
     if ((proy as unknown[]).length === 0) return res.status(404).json({ error: 'Obra no encontrada' });
@@ -263,7 +265,7 @@ router.post('/:id/materiales', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/material/:id', async (req, res, next) => {
+router.delete('/material/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM asignacion_material WHERE id_asignacion = ?', [req.params.id]);
     res.status(204).send();
@@ -286,7 +288,7 @@ const ConsumoSchema = z.object({
   observaciones: z.string().optional(),
 });
 
-router.post('/material/:id/consumos', async (req, res, next) => {
+router.post('/material/:id/consumos', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     const [asig] = await pool.query('SELECT id_asignacion FROM asignacion_material WHERE id_asignacion = ?', [req.params.id]);
     if ((asig as unknown[]).length === 0) return res.status(404).json({ error: 'Asignación no encontrada' });
@@ -301,7 +303,7 @@ router.post('/material/:id/consumos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/consumo/:id', async (req, res, next) => {
+router.delete('/consumo/:id', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM consumo_material WHERE id_consumo = ?', [req.params.id]);
     res.status(204).send();

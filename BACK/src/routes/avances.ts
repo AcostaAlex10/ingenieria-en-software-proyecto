@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_AVANCE } from '../middleware/roles';
 import { calcularEsperadoHoy } from './etapas';
 
 const router = Router();
@@ -60,7 +62,7 @@ router.get('/:planId/avances/resumen', async (req, res, next) => {
 });
 
 // POST /api/planificacion/:planId/avances
-router.post('/:planId/avances', async (req, res, next) => {
+router.post('/:planId/avances', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     // Verificar que la planificación exista
     const [planRows] = await pool.query(
@@ -114,7 +116,7 @@ router.get('/avance/:id', async (req, res, next) => {
 });
 
 // PUT /api/avances/:id
-router.put('/avance/:id', async (req, res, next) => {
+router.put('/avance/:id', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     const data = AvanceSchema.partial().parse(req.body);
     const entries = Object.entries(data);
@@ -131,7 +133,7 @@ router.put('/avance/:id', async (req, res, next) => {
 });
 
 // DELETE /api/avances/:id
-router.delete('/avance/:id', async (req, res, next) => {
+router.delete('/avance/:id', requireRole(...ROLES_AVANCE), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM avance_fisico WHERE id_avance = ?', [req.params.id]);
     res.status(204).send();

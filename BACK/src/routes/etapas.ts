@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_GESTION_OBRA } from '../middleware/roles';
 
 const router = Router();
 
@@ -96,7 +98,7 @@ router.get('/:planId/etapas', async (req, res, next) => {
 });
 
 // POST /api/planificacion/:planId/etapas
-router.post('/:planId/etapas', async (req, res, next) => {
+router.post('/:planId/etapas', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const planId = Number(req.params.planId);
 
@@ -142,7 +144,7 @@ router.post('/:planId/etapas', async (req, res, next) => {
 });
 
 // PUT /api/planificacion/etapa/:id
-router.put('/etapa/:id', async (req, res, next) => {
+router.put('/etapa/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const [etapaRows] = await pool.query(
       'SELECT * FROM etapa_planificacion WHERE id_etapa = ?', [req.params.id]
@@ -182,7 +184,7 @@ router.put('/etapa/:id', async (req, res, next) => {
 });
 
 // DELETE /api/planificacion/etapa/:id
-router.delete('/etapa/:id', async (req, res, next) => {
+router.delete('/etapa/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM etapa_planificacion WHERE id_etapa = ?', [req.params.id]);
     res.status(204).send();

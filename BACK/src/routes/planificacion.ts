@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_GESTION_OBRA } from '../middleware/roles';
 
 const router = Router();
 
@@ -25,7 +27,7 @@ router.get('/:proyectoId/planificacion', async (req, res, next) => {
 });
 
 // POST /api/proyectos/:proyectoId/planificacion
-router.post('/:proyectoId/planificacion', async (req, res, next) => {
+router.post('/:proyectoId/planificacion', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     // Verificar que el proyecto exista
     const [proyectos] = await pool.query(
@@ -65,7 +67,7 @@ router.post('/:proyectoId/planificacion', async (req, res, next) => {
 });
 
 // PUT /api/planificacion/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const data = PlanificacionSchema.partial().parse(req.body);
     const entries = Object.entries(data);
@@ -82,7 +84,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/planificacion/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM planificacion WHERE id_planificacion = ?', [req.params.id]);
     res.status(204).send();

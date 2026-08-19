@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_GESTION_OBRA, ROLES_DOC } from '../middleware/roles';
 
 // Gestion de maquinaria (RF23/RF24/RF27/RF28). Se monta en /api/maquinaria.
 const router = Router();
@@ -48,7 +50,7 @@ router.get('/', async (_req, res, next) => {
 const MaquinariaSchema = z.object({ nombre: z.string().min(1), tipo: z.string().min(1) });
 
 // POST /api/maquinaria
-router.post('/', async (req, res, next) => {
+router.post('/', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const data = MaquinariaSchema.parse(req.body);
     const [result] = await pool.query('INSERT INTO maquinaria (nombre, tipo) VALUES (?, ?)',
@@ -58,7 +60,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // DELETE /api/maquinaria/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM maquinaria WHERE id_maquinaria = ?', [req.params.id]);
     res.status(204).send();
@@ -132,7 +134,7 @@ const RegistroSchema = z.object({
 });
 
 // POST /api/maquinaria/:idMaq/registros
-router.post('/:idMaq/registros', async (req, res, next) => {
+router.post('/:idMaq/registros', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const [maq] = await pool.query('SELECT id_maquinaria FROM maquinaria WHERE id_maquinaria = ?', [req.params.idMaq]);
     if ((maq as unknown[]).length === 0) return res.status(404).json({ error: 'Maquinaria no encontrada' });
@@ -149,7 +151,7 @@ router.post('/:idMaq/registros', async (req, res, next) => {
 });
 
 // DELETE /api/maquinaria/registro/:id
-router.delete('/registro/:id', async (req, res, next) => {
+router.delete('/registro/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM registro_maquinaria WHERE id_registro = ?', [req.params.id]);
     res.status(204).send();
@@ -183,7 +185,7 @@ const FallaSchema = z.object({
 });
 
 // POST /api/maquinaria/:idMaq/fallas
-router.post('/:idMaq/fallas', async (req, res, next) => {
+router.post('/:idMaq/fallas', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const [maq] = await pool.query('SELECT id_maquinaria FROM maquinaria WHERE id_maquinaria = ?', [req.params.idMaq]);
     if ((maq as unknown[]).length === 0) return res.status(404).json({ error: 'Maquinaria no encontrada' });
@@ -199,7 +201,7 @@ router.post('/:idMaq/fallas', async (req, res, next) => {
 });
 
 // DELETE /api/maquinaria/falla/:id
-router.delete('/falla/:id', async (req, res, next) => {
+router.delete('/falla/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM falla_maquinaria WHERE id_falla = ?', [req.params.id]);
     res.status(204).send();

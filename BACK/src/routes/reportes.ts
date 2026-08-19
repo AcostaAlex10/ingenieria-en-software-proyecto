@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_DOC, ROLES_REPORTE_APROBAR } from '../middleware/roles';
 
 // Reportes operativos con flujo de aprobacion (RF21/RF17).
 // Ciclo: borrador -> en_revision -> aprobado | rechazado (-> en_revision).
@@ -52,7 +54,7 @@ const CrearSchema = z.object({
 });
 
 // POST /api/reportes  -> crea en borrador (autor = usuario del token)
-router.post('/', async (req, res, next) => {
+router.post('/', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const data = CrearSchema.parse(req.body);
     const [proy] = await pool.query('SELECT id_proyecto FROM proyecto WHERE id_proyecto = ?', [data.id_proyecto]);
@@ -72,7 +74,7 @@ router.post('/', async (req, res, next) => {
 const EditarSchema = z.object({ titulo: z.string().min(1), contenido: z.string().min(1) });
 
 // PUT /api/reportes/:id  -> editar (solo borrador o rechazado)
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const actual = await buscarRaw(req.params.id);
     if (!actual) return res.status(404).json({ error: 'Reporte no encontrado' });
@@ -87,7 +89,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // POST /api/reportes/:id/enviar  -> manda a revision
-router.post('/:id/enviar', async (req, res, next) => {
+router.post('/:id/enviar', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     const actual = await buscarRaw(req.params.id);
     if (!actual) return res.status(404).json({ error: 'Reporte no encontrado' });
@@ -109,7 +111,7 @@ async function resolver(req: import('express').Request, res: import('express').R
 }
 
 // POST /api/reportes/:id/aprobar
-router.post('/:id/aprobar', async (req, res, next) => {
+router.post('/:id/aprobar', requireRole(...ROLES_REPORTE_APROBAR), async (req, res, next) => {
   try {
     const obs = typeof req.body?.observacion === 'string' && req.body.observacion.trim() ? req.body.observacion.trim() : null;
     return await resolver(req, res, 'aprobado', obs);
@@ -117,7 +119,7 @@ router.post('/:id/aprobar', async (req, res, next) => {
 });
 
 // POST /api/reportes/:id/rechazar  (observacion obligatoria)
-router.post('/:id/rechazar', async (req, res, next) => {
+router.post('/:id/rechazar', requireRole(...ROLES_REPORTE_APROBAR), async (req, res, next) => {
   try {
     const obs = typeof req.body?.observacion === 'string' ? req.body.observacion.trim() : '';
     if (!obs) return res.status(422).json({ errors: { observacion: 'Indicá el motivo del rechazo' } });
@@ -126,7 +128,7 @@ router.post('/:id/rechazar', async (req, res, next) => {
 });
 
 // DELETE /api/reportes/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireRole(...ROLES_DOC), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM reporte WHERE id_reporte = ?', [req.params.id]);
     res.status(204).send();

@@ -12,7 +12,7 @@ import obraRouter from './routes/obra';
 import materialesRouter from './routes/materiales';
 import reportesRouter from './routes/reportes';
 import maquinariaRouter from './routes/maquinaria';
-import { optionalAuth } from './middleware/optionalAuth';
+import { verifyJWT } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -28,14 +28,21 @@ app.use(cors({ origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) :
 
 app.use(express.json());
 
-// Auth blando: si hay token valido, deja el usuario en req.user (sin exigir login).
-// Lo usan /analisis (ocultar costos por rol) y /reportes (autor del reporte).
-app.use(optionalAuth);
-
+// --- Rutas publicas (no exigen token) ---
 // Health-check: lo usan las plataformas de hosting para saber si el servicio esta vivo.
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
-app.use('/api/auth', authRouter);                 // /login, /register, /me
+// /login, /olvide y /restablecer son publicas; /register y /me validan el token
+// puertas adentro del propio router.
+app.use('/api/auth', authRouter);
+
+// --- De aca en adelante TODO exige autenticacion (RF19) ---
+// Se aplica UNA sola vez sobre /api (health y auth ya quedaron registrados
+// arriba, asi que no los alcanza). Montarlo por router repetiria la validacion
+// —y su consulta a la base— en cada prefijo que comparte ruta.
+app.use('/api', verifyJWT);
+
+// Cada router aplica ademas requireRole() en sus rutas de escritura.
 app.use('/api/proyectos', proyectosRouter);
 app.use('/api/proyectos', planificacionRouter);   // /:proyectoId/planificacion
 app.use('/api/proyectos', obraRouter);            // asistencias, incidencias, docs, materiales, etc.

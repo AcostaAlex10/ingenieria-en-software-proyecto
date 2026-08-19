@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
+import { requireRole } from '../middleware/auth';
+import { ROLES_GESTION_OBRA, debeOcultarCostos } from '../middleware/roles';
 
 const router = Router();
 
@@ -17,13 +19,19 @@ type ProyectoRow = {
 };
 
 // Ajusta tipos: id como string y numericos como number (igual que el contrato PHP).
-function normalizar(fila: ProyectoRow) {
-  return {
+// RF20: si el usuario es Personal Tecnico se quita el presupuesto de la respuesta
+// (no alcanza con ocultarlo en el front: la API no debe exponerlo).
+function normalizar(fila: ProyectoRow, ocultarCostos = false) {
+  const salida = {
     ...fila,
     id: String(fila.id),
     avance: Number(fila.avance),
     presupuesto: Number(fila.presupuesto),
   };
+  if (ocultarCostos) {
+    delete (salida as Partial<typeof salida>).presupuesto;
+  }
+  return salida;
 }
 
 const ProyectoSchema = z.object({
@@ -52,7 +60,8 @@ router.get('/', async (req, res, next) => {
     } else {
       [rows] = await pool.query(`${SELECT} ORDER BY id_proyecto DESC`);
     }
-    res.json((rows as ProyectoRow[]).map(normalizar));
+    const ocultar = debeOcultarCostos(req.user?.rol);
+    res.json((rows as ProyectoRow[]).map((f) => normalizar(f, ocultar)));
   } catch (err) {
     next(err);
   }
@@ -64,14 +73,14 @@ router.get('/:id', async (req, res, next) => {
     const [rows] = await pool.query(`${SELECT} WHERE id_proyecto = ?`, [req.params.id]);
     const proyecto = (rows as ProyectoRow[])[0];
     if (!proyecto) return res.status(404).json({ error: 'Proyecto no encontrado' });
-    res.json(normalizar(proyecto));
+    res.json(normalizar(proyecto, debeOcultarCostos(req.user?.rol)));
   } catch (err) {
     next(err);
   }
 });
 
 // POST /api/proyectos
-router.post('/', async (req, res, next) => {
+router.post('/', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const data = ProyectoSchema.parse(req.body);
     const [result] = await pool.query(
@@ -92,7 +101,7 @@ router.post('/', async (req, res, next) => {
 });
 
 // PUT /api/proyectos/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     const data = ProyectoSchema.partial().parse(req.body);
 
@@ -124,7 +133,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE /api/proyectos/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', requireRole(...ROLES_GESTION_OBRA), async (req, res, next) => {
   try {
     await pool.query('DELETE FROM proyecto WHERE id_proyecto = ?', [req.params.id]);
     res.status(204).send();

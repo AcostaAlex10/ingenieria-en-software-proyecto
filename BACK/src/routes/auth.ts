@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 import { pool } from '../config/db';
 import { verifyJWT, requireRole, JwtPayload } from '../middleware/auth';
+import { enviarMail } from '../config/mailer';
 
 const router = Router();
 
@@ -59,17 +61,27 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Credenciales invalidas' });
     }
 
-    // 5) Generar el token. NUNCA metemos la contrasena/hash en el payload.
+    // 5) Identificador de sesion: cada login genera uno nuevo y pisa el anterior,
+    //    asi el token viejo deja de valer (un usuario no queda logueado en dos
+    //    lados a la vez). verifyJWT lo compara contra la base en cada request.
+    const sid = randomBytes(16).toString('hex');
+    await pool.query('UPDATE usuario SET sesion_token = ? WHERE id_usuario = ?', [
+      sid,
+      usuario.id_usuario,
+    ]);
+
+    // 6) Generar el token. NUNCA metemos la contrasena/hash en el payload.
     const payload: JwtPayload = {
       id_usuario: usuario.id_usuario,
       email: usuario.email,
       rol: usuario.rol,
+      sid,
     };
     const token = jwt.sign(payload, process.env.JWT_SECRET ?? '', {
       expiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
     } as jwt.SignOptions);
 
-    // 6) Devolver el token y datos publicos del usuario (sin el hash).
+    // 7) Devolver el token y datos publicos del usuario (sin el hash).
     res.json({
       token,
       usuario: {
@@ -142,6 +154,89 @@ router.post(
 // ------------------------------------------------------------------
 router.get('/me', verifyJWT, (req, res) => {
   res.json({ usuario: req.user });
+});
+
+// ------------------------------------------------------------------
+// POST /api/auth/olvide
+// Paso 1 de recuperacion: genera un token de reset y manda el enlace por mail.
+// Responde SIEMPRE lo mismo (exista o no el email) para no revelar que
+// direcciones estan registradas.
+// ------------------------------------------------------------------
+router.post('/olvide', async (req, res, next) => {
+  const respuestaGenerica = {
+    mensaje: 'Si el email está registrado, te enviamos instrucciones para recuperar la contraseña.',
+  };
+  try {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    if (!z.string().email().safeParse(email).success) {
+      return res.json(respuestaGenerica);
+    }
+
+    const [rows] = await pool.query('SELECT id_usuario, nombre FROM usuario WHERE email = ?', [email]);
+    const usuario = (rows as { id_usuario: number; nombre: string }[])[0];
+
+    if (usuario) {
+      const token = randomBytes(16).toString('hex');
+      // Vencimiento en UTC (1 hora) para que coincida con el NOW() de la base.
+      const expira = new Date(Date.now() + 3600_000).toISOString().slice(0, 19).replace('T', ' ');
+      await pool.query('UPDATE usuario SET reset_token = ?, reset_expira = ? WHERE id_usuario = ?', [
+        token,
+        expira,
+        usuario.id_usuario,
+      ]);
+
+      const base = (process.env.APP_URL ?? process.env.CORS_ORIGIN ?? '').split(',')[0].replace(/\/$/, '');
+      const enlace = `${base}/restablecer?token=${token}`;
+      const html =
+        '<h2>Recuperación de contraseña - SGSO</h2>' +
+        `<p>Hola ${usuario.nombre},</p>` +
+        '<p>Para definir una nueva contraseña, hacé clic en el siguiente enlace (vence en 1 hora):</p>' +
+        `<p><a href="${enlace}">${enlace}</a></p>` +
+        '<p>Si no solicitaste esto, ignorá este correo.</p>';
+
+      await enviarMail(email, 'Recuperá tu contraseña - SGSO', html);
+    }
+
+    res.json(respuestaGenerica);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ------------------------------------------------------------------
+// POST /api/auth/restablecer
+// Paso 2: con el token del email, el usuario define una contrasena nueva.
+// ------------------------------------------------------------------
+router.post('/restablecer', async (req, res, next) => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const contrasena = typeof req.body?.contrasena === 'string' ? req.body.contrasena : '';
+
+    if (!token) return res.status(400).json({ error: 'Falta el token' });
+    if (contrasena.length < 6) {
+      return res.status(422).json({ errors: { contrasena: 'Debe tener al menos 6 caracteres' } });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id_usuario FROM usuario WHERE reset_token = ? AND reset_expira > NOW()',
+      [token]
+    );
+    const usuario = (rows as { id_usuario: number }[])[0];
+    if (!usuario) {
+      return res.status(400).json({ error: 'El enlace no es válido o venció. Pedí uno nuevo.' });
+    }
+
+    // Nueva contrasena + invalidar el token de reset y cualquier sesion activa.
+    const hash = await bcrypt.hash(contrasena, 10);
+    await pool.query(
+      'UPDATE usuario SET contrasena = ?, reset_token = NULL, reset_expira = NULL, sesion_token = NULL WHERE id_usuario = ?',
+      [hash, usuario.id_usuario]
+    );
+
+    res.json({ mensaje: 'Contraseña actualizada. Ya podés iniciar sesión.' });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
