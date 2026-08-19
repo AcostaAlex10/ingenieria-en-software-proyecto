@@ -432,3 +432,38 @@ export async function eliminarFallaMaq(id: number): Promise<void> {
 export async function rendimientoOperarios(): Promise<RendimientoOperario[]> {
   return parse(await apiFetch(`/maquinaria/operarios`));
 }
+
+// ---------- Gestión de usuarios (HU16, completa RF19) ----------
+export type RolUsuario =
+  | "PersonalAdministrativo"
+  | "PersonalTecnico"
+  | "Gerente"
+  | "AdministradorSistema";
+
+export interface Usuario {
+  id_usuario: number;
+  nombre: string;
+  email: string;
+  rol: RolUsuario;
+  activo: boolean;
+  fecha_creacion?: string;
+}
+
+export async function listarUsuarios(): Promise<Usuario[]> {
+  return parse(await apiFetch(`/usuarios`));
+}
+/** Alta de usuario: reutiliza el registro del módulo de autenticación. */
+export async function crearUsuario(datos: {
+  nombre: string;
+  email: string;
+  contrasena: string;
+  rol: RolUsuario;
+}): Promise<Usuario> {
+  return parse(await apiFetch(`/auth/register`, { method: "POST", body: JSON.stringify(datos) }));
+}
+export async function actualizarUsuario(
+  id: number,
+  datos: { rol?: RolUsuario; activo?: boolean }
+): Promise<Usuario> {
+  return parse(await apiFetch(`/usuarios/${id}`, { method: "PUT", body: JSON.stringify(datos) }));
+}

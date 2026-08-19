@@ -8,6 +8,7 @@ import {
   BarChart3,
   Bell,
   Wrench,
+  Users,
   HardHat,
   ChevronRight,
   Clock,
@@ -17,6 +18,7 @@ import { Toaster } from "./ui/sonner";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { getUsuario, clearSession } from "../auth/session";
+import { puedeGestionarUsuarios } from "../auth/permisos";
 import { apiFetch } from "../auth/api";
 import { obtenerAnalisis } from "../api/proyectos";
 
@@ -29,6 +31,8 @@ const navItems = [
   { path: "/reportes", label: "Reportes", icon: BarChart3, abbr: "REP" },
   { path: "/alertas", label: "Alertas", icon: Bell, abbr: "ALE", alert: true },
   { path: "/maquinaria", label: "Maquinaria", icon: Wrench, abbr: "MAQ" },
+  // HU16: solo lo ve el AdministradorSistema (se filtra al renderizar).
+  { path: "/usuarios", label: "Usuarios", icon: Users, abbr: "USR", soloAdmin: true },
 ];
 
 function LiveClock() {
@@ -171,7 +175,7 @@ export default function Root() {
           <div style={{ fontSize: "10px", color: "var(--muted-foreground)", letterSpacing: "0.1em", textTransform: "uppercase", padding: "4px 12px 8px" }}>
             Módulos
           </div>
-          {navItems.map((item) => {
+          {navItems.filter((item) => !item.soloAdmin || puedeGestionarUsuarios()).map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
             return (

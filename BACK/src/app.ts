@@ -12,6 +12,7 @@ import obraRouter from './routes/obra';
 import materialesRouter from './routes/materiales';
 import reportesRouter from './routes/reportes';
 import maquinariaRouter from './routes/maquinaria';
+import usuariosRouter from './routes/usuarios';
 import { verifyJWT } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -52,6 +53,7 @@ app.use('/api/materiales', materialesRouter);     // catalogo global de material
 app.use('/api/reportes', reportesRouter);         // reportes con flujo de aprobacion
 app.use('/api/maquinaria', maquinariaRouter);     // equipos, registros, fallas (RF23-28)
 app.use('/api/analisis', analisisRouter);         // resumen de proyectos (RF11, RF13)
+app.use('/api/usuarios', usuariosRouter);         // gestion de cuentas y roles (HU16)
 
 app.use(errorHandler);
 

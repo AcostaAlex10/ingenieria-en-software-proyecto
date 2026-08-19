@@ -13,6 +13,7 @@ import DocumentacionPage from "./components/DocumentacionPage";
 import ReportesPage from "./components/ReportesPage";
 import AlertasPage from "./components/AlertasPage";
 import MaquinariaPage from "./components/MaquinariaPage";
+import UsuariosPage from "./components/UsuariosPage";
 import NotFound from "./components/NotFound";
 
 export const router = createBrowserRouter([
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "reportes", Component: ReportesPage },
       { path: "alertas", Component: AlertasPage },
       { path: "maquinaria", Component: MaquinariaPage },
+      { path: "usuarios", Component: UsuariosPage },
       { path: "*", Component: NotFound },
     ],
   },
