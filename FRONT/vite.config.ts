@@ -16,7 +16,13 @@ function figmaAssetResolver() {
   }
 }
 
+// Ruta base del sitio. En Vercel la app vive en la raiz del dominio, pero en
+// GitHub Pages queda bajo /<repo>/. El workflow de Pages define BASE_PATH; si no
+// existe, se compila para la raiz y el deploy de Vercel no se ve afectado.
+const BASE_PATH = process.env.BASE_PATH ?? '/'
+
 export default defineConfig({
+  base: BASE_PATH,
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if

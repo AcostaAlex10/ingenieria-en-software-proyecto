@@ -1,0 +1,126 @@
+{
+  "_aviso": "Datos ficticios para el modo de prueba estatico. Las contrasenas de esta lista son de demostracion y no corresponden a ninguna cuenta real del sistema.",
+  "usuarios": [
+    { "id_usuario": 1, "nombre": "Administrador del Sistema", "email": "admin@sgso.test", "contrasena": "admin123", "rol": "AdministradorSistema", "activo": true, "fecha_creacion": "2026-01-10" },
+    { "id_usuario": 2, "nombre": "Ana Duarte", "email": "administrativo@sgso.test", "contrasena": "admin123", "rol": "PersonalAdministrativo", "activo": true, "fecha_creacion": "2026-01-12" },
+    { "id_usuario": 3, "nombre": "Juan Pérez", "email": "tecnico@sgso.test", "contrasena": "tecnico123", "rol": "PersonalTecnico", "activo": true, "fecha_creacion": "2026-01-12" },
+    { "id_usuario": 4, "nombre": "Claudia Rossi", "email": "gerente@sgso.test", "contrasena": "gerente123", "rol": "Gerente", "activo": true, "fecha_creacion": "2026-02-01" },
+    { "id_usuario": 5, "nombre": "Marcos Silva", "email": "tecnico2@sgso.test", "contrasena": "tecnico123", "rol": "PersonalTecnico", "activo": false, "fecha_creacion": "2026-02-20" }
+  ],
+  "proyectos": [
+    { "id": "1", "nombre": "Puente Foz do Iguazú", "tipo": "Infraestructura Vial", "ubicacion": "Puerto Iguazú, Misiones", "encargado": "Ing. Laura Fernández", "fechaInicio": "2026-03-02", "estado": "en_ejecucion", "avance": 45, "presupuesto": 85000000 },
+    { "id": "2", "nombre": "Escuela N° 12", "tipo": "Construcción Edilicia", "ubicacion": "Eldorado, Misiones", "encargado": "Ing. Marcos Duarte", "fechaInicio": "2026-04-15", "estado": "en_ejecucion", "avance": 20, "presupuesto": 32000000 },
+    { "id": "3", "nombre": "Ruta Provincial 14 - Tramo II", "tipo": "Infraestructura Vial", "ubicacion": "Oberá, Misiones", "encargado": "Ing. Roberto Suénaga", "fechaInicio": "2026-01-20", "estado": "en_ejecucion", "avance": 72, "presupuesto": 150000000 },
+    { "id": "4", "nombre": "Centro de Salud Norte", "tipo": "Construcción Edilicia", "ubicacion": "Posadas, Misiones", "encargado": "Arq. Silvia Ramos", "fechaInicio": "2026-05-05", "estado": "planificacion", "avance": 0, "presupuesto": 48000000 },
+    { "id": "5", "nombre": "Red Cloacal Barrio San Jorge", "tipo": "Obra Sanitaria", "ubicacion": "Apóstoles, Misiones", "encargado": "Ing. Diego Cabrera", "fechaInicio": "2025-09-10", "estado": "finalizada", "avance": 100, "presupuesto": 27000000 },
+    { "id": "6", "nombre": "Pavimentación Acceso Sur", "tipo": "Infraestructura Vial", "ubicacion": "Leandro N. Alem, Misiones", "encargado": "Ing. Laura Fernández", "fechaInicio": "2026-02-10", "estado": "pausada", "avance": 30, "presupuesto": 61000000 }
+  ],
+  "planificaciones": [
+    { "id_planificacion": 1, "id_proyecto": 1, "avance_esperado_total": 60, "fecha_carga": "2026-03-02" },
+    { "id_planificacion": 2, "id_proyecto": 2, "avance_esperado_total": 35, "fecha_carga": "2026-04-15" },
+    { "id_planificacion": 3, "id_proyecto": 3, "avance_esperado_total": 70, "fecha_carga": "2026-01-20" },
+    { "id_planificacion": 4, "id_proyecto": 5, "avance_esperado_total": 100, "fecha_carga": "2025-09-10" },
+    { "id_planificacion": 5, "id_proyecto": 6, "avance_esperado_total": 55, "fecha_carga": "2026-02-10" }
+  ],
+  "etapas": [
+    { "id_etapa": 1, "id_planificacion": 1, "nombre": "Movimiento de suelos", "peso_porcentual": 25, "fecha_inicio": "2026-03-02", "fecha_fin": "2026-04-15", "orden": 1, "presupuesto_base": 21000000 },
+    { "id_etapa": 2, "id_planificacion": 1, "nombre": "Fundaciones", "peso_porcentual": 35, "fecha_inicio": "2026-04-16", "fecha_fin": "2026-06-30", "orden": 2, "presupuesto_base": 30000000 },
+    { "id_etapa": 3, "id_planificacion": 1, "nombre": "Estructura", "peso_porcentual": 40, "fecha_inicio": "2026-07-01", "fecha_fin": "2026-10-30", "orden": 3, "presupuesto_base": 34000000 },
+    { "id_etapa": 4, "id_planificacion": 2, "nombre": "Cimientos", "peso_porcentual": 40, "fecha_inicio": "2026-04-15", "fecha_fin": "2026-06-15", "orden": 1, "presupuesto_base": 13000000 },
+    { "id_etapa": 5, "id_planificacion": 2, "nombre": "Mampostería", "peso_porcentual": 60, "fecha_inicio": "2026-06-16", "fecha_fin": "2026-09-30", "orden": 2, "presupuesto_base": 19000000 },
+    { "id_etapa": 6, "id_planificacion": 3, "nombre": "Base y sub-base", "peso_porcentual": 50, "fecha_inicio": "2026-01-20", "fecha_fin": "2026-04-30", "orden": 1, "presupuesto_base": 75000000 },
+    { "id_etapa": 7, "id_planificacion": 3, "nombre": "Carpeta asfáltica", "peso_porcentual": 50, "fecha_inicio": "2026-05-01", "fecha_fin": "2026-08-30", "orden": 2, "presupuesto_base": 75000000 },
+    { "id_etapa": 8, "id_planificacion": 5, "nombre": "Preparación de terreno", "peso_porcentual": 100, "fecha_inicio": "2026-02-10", "fecha_fin": "2026-05-30", "orden": 1, "presupuesto_base": 61000000 }
+  ],
+  "avances": [
+    { "id_avance": 1, "id_planificacion": 1, "cantidad_ejecutada": 120, "porcentaje_avance": 15, "fecha": "2026-03-20", "observaciones": "Excavación del estribo norte" },
+    { "id_avance": 2, "id_planificacion": 1, "cantidad_ejecutada": 240, "porcentaje_avance": 30, "fecha": "2026-04-18", "observaciones": null },
+    { "id_avance": 3, "id_planificacion": 1, "cantidad_ejecutada": 360, "porcentaje_avance": 45, "fecha": "2026-05-22", "observaciones": "Hormigonado de pilotes" },
+    { "id_avance": 4, "id_planificacion": 2, "cantidad_ejecutada": 40, "porcentaje_avance": 12, "fecha": "2026-05-10", "observaciones": null },
+    { "id_avance": 5, "id_planificacion": 2, "cantidad_ejecutada": 70, "porcentaje_avance": 20, "fecha": "2026-06-08", "observaciones": "Avance menor al previsto por lluvias" },
+    { "id_avance": 6, "id_planificacion": 3, "cantidad_ejecutada": 1800, "porcentaje_avance": 40, "fecha": "2026-03-15", "observaciones": null },
+    { "id_avance": 7, "id_planificacion": 3, "cantidad_ejecutada": 2600, "porcentaje_avance": 58, "fecha": "2026-05-02", "observaciones": null },
+    { "id_avance": 8, "id_planificacion": 3, "cantidad_ejecutada": 3240, "porcentaje_avance": 72, "fecha": "2026-06-14", "observaciones": "Se completó la base en el tramo II" },
+    { "id_avance": 9, "id_planificacion": 4, "cantidad_ejecutada": 900, "porcentaje_avance": 100, "fecha": "2026-01-30", "observaciones": "Obra finalizada y certificada" },
+    { "id_avance": 10, "id_planificacion": 5, "cantidad_ejecutada": 300, "porcentaje_avance": 30, "fecha": "2026-04-01", "observaciones": "Obra pausada por falta de materiales" }
+  ],
+  "asistencias": [
+    { "id_asistencia": 1, "id_proyecto": 1, "fecha": "2026-06-10", "trabajador": "Juan Pérez", "estado": "presente", "justificacion": null },
+    { "id_asistencia": 2, "id_proyecto": 1, "fecha": "2026-06-10", "trabajador": "Luis Díaz", "estado": "tarde", "justificacion": "Demora en el transporte" },
+    { "id_asistencia": 3, "id_proyecto": 1, "fecha": "2026-06-11", "trabajador": "Carlos Gómez", "estado": "ausente", "justificacion": "Licencia médica" },
+    { "id_asistencia": 4, "id_proyecto": 3, "fecha": "2026-06-12", "trabajador": "Marcos Silva", "estado": "presente", "justificacion": null },
+    { "id_asistencia": 5, "id_proyecto": 3, "fecha": "2026-06-12", "trabajador": "Juan Pérez", "estado": "presente", "justificacion": null }
+  ],
+  "incidencias": [
+    { "id_incidencia": 1, "id_proyecto": 1, "fecha": "2026-05-28", "tipo": "clima", "gravedad": "media", "descripcion": "Lluvias intensas durante dos jornadas", "dias_retraso": 2 },
+    { "id_incidencia": 2, "id_proyecto": 2, "fecha": "2026-06-05", "tipo": "proveedor", "gravedad": "alta", "descripcion": "Demora en la entrega de hierro del proveedor", "dias_retraso": 6 },
+    { "id_incidencia": 3, "id_proyecto": 3, "fecha": "2026-04-19", "tipo": "falla_maquinaria", "gravedad": "alta", "descripcion": "Rotura de la motoniveladora en el tramo II", "dias_retraso": 4 },
+    { "id_incidencia": 4, "id_proyecto": 6, "fecha": "2026-03-30", "tipo": "otro", "gravedad": "baja", "descripcion": "Corte de energía en el obrador", "dias_retraso": 1 }
+  ],
+  "materiales": [
+    { "id_material": 1, "nombre": "Cemento", "unidad": "bolsa" },
+    { "id_material": 2, "nombre": "Hierro del 8", "unidad": "barra" },
+    { "id_material": 3, "nombre": "Arena", "unidad": "m3" },
+    { "id_material": 4, "nombre": "Piedra triturada", "unidad": "m3" },
+    { "id_material": 5, "nombre": "Ladrillo hueco", "unidad": "unidad" },
+    { "id_material": 6, "nombre": "Cal", "unidad": "bolsa" },
+    { "id_material": 7, "nombre": "Asfalto", "unidad": "tonelada" },
+    { "id_material": 8, "nombre": "Caño PVC 110", "unidad": "metro" },
+    { "id_material": 9, "nombre": "Madera para encofrado", "unidad": "m2" },
+    { "id_material": 10, "nombre": "Combustible", "unidad": "litro" }
+  ],
+  "asignaciones": [
+    { "id_asignacion": 1, "id_proyecto": 1, "id_material": 1, "cantidad_asignada": 50 },
+    { "id_asignacion": 2, "id_proyecto": 1, "id_material": 2, "cantidad_asignada": 100 },
+    { "id_asignacion": 3, "id_proyecto": 1, "id_material": 9, "cantidad_asignada": 200 },
+    { "id_asignacion": 4, "id_proyecto": 3, "id_material": 3, "cantidad_asignada": 500 },
+    { "id_asignacion": 5, "id_proyecto": 3, "id_material": 7, "cantidad_asignada": 80 },
+    { "id_asignacion": 6, "id_proyecto": 2, "id_material": 5, "cantidad_asignada": 4000 }
+  ],
+  "consumos": [
+    { "id_consumo": 1, "id_asignacion": 1, "fecha": "2026-04-10", "cantidad_consumida": 30, "observaciones": null },
+    { "id_consumo": 2, "id_asignacion": 1, "fecha": "2026-05-15", "cantidad_consumida": 30, "observaciones": "Se superó lo asignado" },
+    { "id_consumo": 3, "id_asignacion": 2, "fecha": "2026-05-02", "cantidad_consumida": 30, "observaciones": null },
+    { "id_consumo": 4, "id_asignacion": 4, "fecha": "2026-03-18", "cantidad_consumida": 120, "observaciones": null },
+    { "id_consumo": 5, "id_asignacion": 5, "fecha": "2026-05-20", "cantidad_consumida": 95, "observaciones": "Consumo por encima de lo previsto" },
+    { "id_consumo": 6, "id_asignacion": 6, "fecha": "2026-06-01", "cantidad_consumida": 1200, "observaciones": null }
+  ],
+  "documentos": [
+    { "id_documento": 1, "id_proyecto": 1, "nombre": "Plano general del puente", "tipo": "pdf", "categoria": "Planos", "url": "https://example.org/sgso/plano-puente.pdf", "fecha_carga": "2026-03-05" },
+    { "id_documento": 2, "id_proyecto": 1, "nombre": "Reporte fotográfico mayo", "tipo": "imagen", "categoria": "Fotografías", "url": "https://example.org/sgso/fotos-mayo.jpg", "fecha_carga": "2026-05-30" },
+    { "id_documento": 3, "id_proyecto": 3, "nombre": "Certificado de avance N° 3", "tipo": "pdf", "categoria": "Certificaciones", "url": "https://example.org/sgso/certificado-3.pdf", "fecha_carga": "2026-06-15" },
+    { "id_documento": 4, "id_proyecto": 2, "nombre": "Contrato de obra", "tipo": "pdf", "categoria": "Administrativo", "url": "https://example.org/sgso/contrato.pdf", "fecha_carga": "2026-04-16" }
+  ],
+  "reportes": [
+    { "id_reporte": 1, "id_proyecto": 1, "id_usuario": 3, "titulo": "Parte diario 10/06", "contenido": "Se hormigonaron cuatro pilotes. Dotación completa salvo un ausente con licencia.", "estado": "aprobado", "observacion_revision": "Conforme.", "fecha_creacion": "2026-06-10", "fecha_revision": "2026-06-11" },
+    { "id_reporte": 2, "id_proyecto": 1, "id_usuario": 3, "titulo": "Parte diario 11/06", "contenido": "Jornada reducida por lluvia. Se avanzó con el encofrado.", "estado": "en_revision", "observacion_revision": null, "fecha_creacion": "2026-06-11", "fecha_revision": null },
+    { "id_reporte": 3, "id_proyecto": 3, "id_usuario": 5, "titulo": "Avance semanal tramo II", "contenido": "Se completó la base del tramo II y se inició la carpeta asfáltica.", "estado": "borrador", "observacion_revision": null, "fecha_creacion": "2026-06-14", "fecha_revision": null },
+    { "id_reporte": 4, "id_proyecto": 2, "id_usuario": 3, "titulo": "Parte diario 05/06", "contenido": "Sin avance por falta de material.", "estado": "rechazado", "observacion_revision": "Falta detallar la incidencia con el proveedor.", "fecha_creacion": "2026-06-05", "fecha_revision": "2026-06-06" }
+  ],
+  "inactividades": [
+    { "id_periodo": 1, "id_proyecto": 6, "fecha_inicio": "2026-04-02", "fecha_fin": null, "motivo": "Falta de materiales y redeterminación de precios" },
+    { "id_periodo": 2, "id_proyecto": 1, "fecha_inicio": "2026-05-28", "fecha_fin": "2026-05-29", "motivo": "Lluvias intensas" }
+  ],
+  "excedentes": [
+    { "id_item": 1, "id_proyecto": 1, "descripcion": "Refuerzo adicional de estribo no previsto", "cantidad": 12, "unidad": "m3", "fecha": "2026-05-20", "motivo": "Suelo con menor capacidad portante que la proyectada" },
+    { "id_item": 2, "id_proyecto": 3, "descripcion": "Alcantarilla adicional km 14", "cantidad": 1, "unidad": "unidad", "fecha": "2026-04-25", "motivo": "Pedido de la inspección" }
+  ],
+  "maquinaria": [
+    { "id_maquinaria": 1, "nombre": "Retroexcavadora CAT 320", "tipo": "Excavación", "activa": true },
+    { "id_maquinaria": 2, "nombre": "Motoniveladora John Deere 670", "tipo": "Movimiento de suelos", "activa": true },
+    { "id_maquinaria": 3, "nombre": "Camión volcador Iveco", "tipo": "Transporte", "activa": true },
+    { "id_maquinaria": 4, "nombre": "Compactadora Dynapac", "tipo": "Compactación", "activa": false }
+  ],
+  "registros_maquinaria": [
+    { "id_registro": 1, "id_maquinaria": 1, "id_proyecto": 1, "fecha": "2026-05-12", "operario": "Carlos Gómez", "horas_uso": 8, "combustible_consumido": 72, "produccion_realizada": 160 },
+    { "id_registro": 2, "id_maquinaria": 1, "id_proyecto": 1, "fecha": "2026-05-13", "operario": "Carlos Gómez", "horas_uso": 7, "combustible_consumido": 63, "produccion_realizada": 140 },
+    { "id_registro": 3, "id_maquinaria": 1, "id_proyecto": 1, "fecha": "2026-05-14", "operario": "Luis Díaz", "horas_uso": 6, "combustible_consumido": 90, "produccion_realizada": 96 },
+    { "id_registro": 4, "id_maquinaria": 2, "id_proyecto": 3, "fecha": "2026-04-10", "operario": "Luis Díaz", "horas_uso": 9, "combustible_consumido": 108, "produccion_realizada": 270 },
+    { "id_registro": 5, "id_maquinaria": 3, "id_proyecto": 3, "fecha": "2026-05-06", "operario": "Marcos Silva", "horas_uso": 10, "combustible_consumido": 85, "produccion_realizada": 400 }
+  ],
+  "fallas_maquinaria": [
+    { "id_falla": 1, "id_maquinaria": 2, "fecha": "2026-04-19", "componente": "Bomba hidráulica", "descripcion": "Pérdida de presión en el circuito hidráulico", "reemplazo": true, "resuelto": true },
+    { "id_falla": 2, "id_maquinaria": 1, "fecha": "2026-05-14", "componente": "Filtro de combustible", "descripcion": "Consumo anormal, se revisa el sistema de inyección", "reemplazo": false, "resuelto": false },
+    { "id_falla": 3, "id_maquinaria": 4, "fecha": "2026-03-02", "componente": "Rodillo", "descripcion": "Desgaste del rodillo delantero, equipo fuera de servicio", "reemplazo": true, "resuelto": false }
+  ]
+}

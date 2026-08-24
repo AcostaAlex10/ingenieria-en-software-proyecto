@@ -7,6 +7,15 @@ const API_URL =
   (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ??
   "http://localhost:3000/api";
 
+/**
+ * Modo de prueba estatico (VITE_MOCK=1): en vez de llamar al backend, las
+ * peticiones se resuelven contra el servidor simulado de `src/app/mock/`. Se usa
+ * para publicar la app como sitio estatico y probar la interfaz sin backend ni
+ * base de datos. Ver FRONT/MODO-PRUEBA.md.
+ */
+const MODO_PRUEBA =
+  (import.meta as unknown as { env?: { VITE_MOCK?: string } }).env?.VITE_MOCK === "1";
+
 export interface LoginResponse {
   token: string;
   usuario: UsuarioSesion;
@@ -45,12 +54,29 @@ async function fetchConReintentos(
   throw ultimoError ?? new Error("No se pudo conectar con el servidor");
 }
 
+// El servidor simulado se carga solo si el modo de prueba esta activo, asi no
+// entra en el bundle de produccion.
+let mockCargado: Promise<typeof import("../mock/servidor")> | null = null;
+
+/**
+ * Unico punto por el que salen las peticiones: contra el backend real, o
+ * contra el servidor simulado si VITE_MOCK=1.
+ */
+async function transporte(path: string, options: RequestInit): Promise<Response> {
+  if (MODO_PRUEBA) {
+    if (!mockCargado) mockCargado = import("../mock/servidor");
+    const { mockFetch } = await mockCargado;
+    return mockFetch(path, options);
+  }
+  return fetchConReintentos(`${API_URL}${path}`, options);
+}
+
 /**
  * Llama a POST /auth/login. Si las credenciales son invalidas, el backend
  * responde con un status de error y un { error } que convertimos en Error.
  */
 export async function login(email: string, contrasena: string): Promise<LoginResponse> {
-  const res = await fetchConReintentos(`${API_URL}/auth/login`, {
+  const res = await transporte("/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, contrasena }),
@@ -66,7 +92,7 @@ export async function login(email: string, contrasena: string): Promise<LoginRes
 
 /** Recuperacion de contrasena - paso 1: pedir el email de recuperacion. */
 export async function olvideContrasena(email: string): Promise<string> {
-  const res = await fetchConReintentos(`${API_URL}/auth/olvide`, {
+  const res = await transporte("/auth/olvide", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
@@ -78,7 +104,7 @@ export async function olvideContrasena(email: string): Promise<string> {
 
 /** Recuperacion de contrasena - paso 2: definir la nueva con el token del email. */
 export async function restablecerContrasena(token: string, contrasena: string): Promise<string> {
-  const res = await fetchConReintentos(`${API_URL}/auth/restablecer`, {
+  const res = await transporte("/auth/restablecer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, contrasena }),
@@ -120,7 +146,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
     return (await enVuelo.get(clave)!).clone();
   }
 
-  const promesa = fetchConReintentos(`${API_URL}${path}`, { ...options, headers });
+  const promesa = transporte(path, { ...options, headers });
   if (clave) {
     enVuelo.set(clave, promesa);
     promesa.finally(() => enVuelo.delete(clave));

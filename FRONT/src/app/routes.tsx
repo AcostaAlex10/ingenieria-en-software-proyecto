@@ -16,6 +16,13 @@ import MaquinariaPage from "./components/MaquinariaPage";
 import UsuariosPage from "./components/UsuariosPage";
 import NotFound from "./components/NotFound";
 
+// Prefijo del sitio. Es "/" en Vercel y "/<repo>/" en GitHub Pages; Vite lo
+// expone en BASE_URL a partir de la opcion `base`. React Router lo necesita
+// como basename o las rutas quedarian colgando de la raiz equivocada.
+const BASENAME = (
+  (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/"
+).replace(/\/$/, "");
+
 export const router = createBrowserRouter([
   // Rutas publicas (sin sidebar/layout).
   { path: "/login", Component: LoginPage },
@@ -43,4 +50,4 @@ export const router = createBrowserRouter([
       { path: "*", Component: NotFound },
     ],
   },
-]);
+], { basename: BASENAME || undefined });
