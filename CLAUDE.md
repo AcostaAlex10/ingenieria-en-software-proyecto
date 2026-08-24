@@ -4,98 +4,116 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TriweProjectManagement (SGSO)** — Sistema de Gestión y Seguimiento Operativo de Obras de Construcción. The repository currently contains the **frontend prototype only** (built from Figma). The backend (API REST + MariaDB) does not exist yet in this repo; all data is currently static/mocked in the UI.
+**TriweProjectManagement (SGSO)** — Sistema de Gestión y Seguimiento Operativo de Obras de Construcción.
+Academic project for IC-413 (Ingeniería del Software I, UNaM), Grupo 2.
 
-### Planned full-system architecture
-| Layer | Technology | Purpose |
-|---|---|---|
-| SPA | React.js | Web UI for PersonalAdministrativo and Gerencia |
-| PWA | React.js | Mobile/tablet UI for PersonalTecnico in the field |
-| API REST | Node.js / PHP | Business logic, auth, role-based authorization |
-| Database | MariaDB | Persistent storage for all entities |
-| File Storage | S3/local | PDFs, images, attachments (accessed via API) |
-| External | Sistema Municipal de Catastro | Provides domain data, fiscal lot status and urban restrictions via API |
+The repository contains the full system: React SPA, PHP REST API and relational
+schema. See `DOCUMENTACION.md` for domain context and traceability with the
+course assignments, and `README.md` for setup instructions.
+
+### Implemented architecture
+| Layer | Folder | Technology | Deployment |
+|---|---|---|---|
+| SPA | `FRONT/` | React 18 + Vite 6 + TypeScript | Vercel |
+| REST API | `back/` | PHP 8, no framework, PDO | Render (Docker, PHP + Apache) |
+| Database | `back/sql/` | MariaDB / MySQL | Aiven |
+| Alternative API | `back-node/` | Node.js + Express + TypeScript | **Not deployed** |
+
+> **Which backend to edit:** always `back/` (PHP). The course requires PHP over
+> MariaDB and that is what is deployed and consumed by the frontend. `back-node/`
+> is a historical alternative kept for reference — do not add features there and
+> do not treat it as the source of truth for the schema.
 
 ### User roles
-- **PersonalAdministrativo** — registers and manages projects; validates advances and reports
-- **PersonalTecnico** (Encargado de Obra) — registers daily physical advances, attendance, material consumption, machinery usage and incidents from the field
-- **Gerente** — monitors overall advance, consults comparative reports and generates strategic analysis
-- **AdministradorSistema** — manages user accounts and role assignments
+- **AdministradorSistema** — superuser; manages accounts and role assignment
+- **PersonalAdministrativo** — creates/edits projects, planning and materials; approves reports
+- **PersonalTecnico** (Encargado de Obra) — registers daily advance, attendance, material consumption, machinery usage and incidents from the field
+- **Gerente** — read-only: monitors advance, consults comparative reports
+
+Role groups are declared as constants at the top of `back/public/index.php`
+(`ROLES_GESTION_OBRA`, `ROLES_AVANCE`, `ROLES_DOC`, `ROLES_REPORTE_APROBAR`, `ROLES_ADMIN`).
 
 ## Commands
 
-All commands must be run from the `FRONT/` directory.
-
+### Frontend (`FRONT/`)
 ```bash
-# Install dependencies (--legacy-peer-deps is required due to peer conflicts)
-npm install --legacy-peer-deps
-
-# Start dev server
-npm run dev
-
-# Production build
-npm run build
+npm install --legacy-peer-deps   # --legacy-peer-deps is required due to peer conflicts
+npm run dev                      # Vite dev server
+npm run build                    # production build
 ```
 
-> There are no test or lint scripts configured.
+### Backend (`back/`)
+```bash
+php back/sql/migrar.php          # apply schema.sql to the configured database
+php back/sql/seed.php            # create the initial admin user (bcrypt hash)
+php -S localhost:8000 -t back/public
+```
+
+> There are no test or lint scripts configured anywhere in the repo.
 
 ## Architecture
 
-### Stack
+### Frontend stack
 - **React 18** + **React Router v7** (browser router)
 - **Vite 6** with `@vitejs/plugin-react`
 - **Tailwind CSS v4** via `@tailwindcss/vite` (no tailwind.config.js — config is in CSS)
-- **shadcn/ui** component library (60+ pre-built components in `src/app/components/ui/`)
+- **shadcn/ui** component library (`src/app/components/ui/`)
 - **Recharts** for charts, **Leaflet / react-leaflet** for maps
 - Path alias `@` → `FRONT/src`
 
-### Entry points
-- `FRONT/index.html` → `src/main.tsx` → `src/app/App.tsx` → `src/app/routes.tsx`
+Entry points: `FRONT/index.html` → `src/main.tsx` → `src/app/App.tsx` → `src/app/routes.tsx`
 
 ### Routing (`src/app/routes.tsx`)
-A single `Root` layout (sidebar + header) wraps all pages:
+`/login`, `/olvide` and `/restablecer` are public. Every other route is wrapped by
+the `Root` layout (sidebar + header) and requires an authenticated session:
 
-| Route | Component | Use cases covered |
+| Route | Component | Purpose |
 |---|---|---|
-| `/` | `Dashboard` | Global KPIs: active projects, avg advance, active alerts |
-| `/proyectos` | `ProyectosPage` | CU1–CU3: register, modify, delete projects |
-| `/seguimiento` | `SeguimientoPage` | CU10–CU15: daily physical advance, attendance, incidents, external events |
-| `/materiales` | `MaterialesPage` | CU6, CU7, CU22: assign materials to project, register consumption |
-| `/documentacion` | `DocumentacionPage` | CU8, CU9, CU15: upload/query PDF, JPG, PNG files per project |
-| `/reportes` | `ReportesPage` | CU17, CU18, CU22: create, review, approve/reject operational reports |
-| `/alertas` | `AlertasPage` | CU16: view and classify active alerts (advance deviation, cost overrun, anomalous consumption) |
-| `/maquinaria` | `MaquinariaPage` | CU16, CU17, CU20, CU23: log machinery use, register faults and maintenance |
+| `/` | `Dashboard` | Global KPIs and comparative charts |
+| `/proyectos` | `ProyectosPage` | Register, modify, delete and filter projects |
+| `/proyectos/:id` | `ProyectoDetallePage` | Single project detail |
+| `/seguimiento` | `SeguimientoPage` | Daily advance, attendance, incidents, inactivity |
+| `/materiales` | `MaterialesPage` | Assign materials to a project, register consumption |
+| `/documentacion` | `DocumentacionPage` | Upload and query PDF/image files per project |
+| `/reportes` | `ReportesPage` | Create, review and approve/reject operational reports |
+| `/alertas` | `AlertasPage` | Active alerts (advance deviation, cost overrun) |
+| `/maquinaria` | `MaquinariaPage` | Machinery usage logs, faults and maintenance |
+| `/usuarios` | `UsuariosPage` | Account and role management |
+
+### Backend (`back/`)
+Single front controller: `back/public/index.php` parses the path (everything under
+`/api`), validates the JWT and dispatches to a controller in `back/src/`. Resources:
+`auth`, `health`, `proyectos`, `planificacion`, `materiales`, `maquinaria`,
+`reportes`, `analisis`, `usuarios`.
+
+Cross-cutting pieces: `Env` (dotenv loader), `Cors`, `Database` (PDO singleton),
+`Jwt`, `AuthMiddleware`, `Mailer` (Brevo, for password recovery), `Geocoder`.
+
+The timezone is pinned to `America/Argentina/Buenos_Aires` because Render runs in
+UTC and date validations depend on the local date.
 
 ### Styling system
-All styles live in `src/styles/`:
-- `theme.css` — CSS custom properties for the dark/orange theme (`--primary: #e8981e`)
-- `tailwind.css` — Tailwind v4 source detection
-- `globals.css` — base resets
-- `leaflet-custom.css` — map overrides
-
-The active theme is dark with orange accents. `default_shadcn_theme.css` is kept as a light theme reference but not currently applied.
+Styles live in `src/styles/`: `theme.css` (dark/orange theme, `--primary: #e8981e`),
+`tailwind.css`, `globals.css`, `leaflet-custom.css`. `default_shadcn_theme.css` is
+kept as a light-theme reference but is not applied.
 
 ### Domain model
+Seventeen tables in `back/sql/schema.sql`. `proyecto` is the core entity:
 
-The core entity is **PROYECTO**. Key domain entities and their relationships:
+- **proyecto** — one `planificacion`, many `avance_fisico`, `asistencia`, `incidencia`, `periodo_inactividad`, `item_excedente`, `documento`, `reporte`, `asignacion_material`
+- **planificacion / etapa_planificacion** — expected advance and base budget per stage
+- **avance_fisico** — daily physical advance records tied to a planning stage
+- **material / asignacion_material / consumo_material** — catalog → per-project assignment → consumption with stock check
+- **maquinaria / registro_maquinaria / falla_maquinaria** — equipment → usage logs → fault history
+- **usuario** — `rol` enum + `activo` flag, bcrypt password hash, password-reset token
 
-- **PROYECTO** — has one PLANIFICACION, many AVANCE_FISICO, ASISTENCIA, INCIDENCIA, EVENTO_EXTERNO, PERIODO_INACTIVIDAD, REPORTE, MAQUINARIA
-- **PLANIFICACION** — groups expected advance items and base budgets; linked 1-to-many to AVANCE_FISICO
-- **AVANCE_FISICO** — daily physical advance records (cantidad_ejecutada, porcentaje_avance, fecha, observaciones)
-- **MATERIAL / ASIGNACION_MATERIAL / CONSUMO_MATERIAL** — catalog → assignment per project → daily consumption records with stock verification
-- **MAQUINARIA / REGISTRO_MAQUINARIA / FALLA_MAQUINARIA** — equipment registry → daily use logs (horas_uso, combustible_consumido, produccion_realizada) → fault/maintenance history
-- **REPORTE** — operational reports linked to a project, with approval workflow
-- **USUARIO** — has a `rol` field (PersonalAdministrativo, PersonalTecnico, Gerente, AdministradorSistema) and `activo` flag
-
-#### Project lifecycle states
-`Creado` → `Planificado` → `EnEjecucion` ⇄ `Pausado` → `Cancelado`  
-`EnEjecucion` → `EnRevision` → `Finalizado` (or back to `EnEjecucion` if report rejected)
-
-#### Report lifecycle states
-`Borrador` → `EnRevision` → `Aprobado` (Supervisor may reject back to `Borrador`)
+#### State values (as stored, lowercase)
+- Project (`proyecto.estado`, default `planificacion`): `planificacion` → `en_ejecucion` ⇄ `pausada` → `finalizada`
+- Report (`reporte.estado`, default `borrador`): `borrador` → `en_revision` → `aprobado` | `rechazado`
+- Attendance (`asistencia.estado`): `presente` | `ausente` | `tarde`
+- Incident (`incidencia`): type `clima` | `falla_maquinaria` | `proveedor` | `otro`; severity `baja` | `media` | `alta`
 
 ### Component conventions
-- Page-level components live directly in `src/app/components/` (e.g., `Dashboard.tsx`, `ProyectosPage.tsx`)
-- Reusable shadcn/ui primitives are in `src/app/components/ui/`
+- Page-level components live directly in `src/app/components/`; shadcn/ui primitives in `src/app/components/ui/`
 - `src/app/components/figma/ImageWithFallback.tsx` handles Figma-exported images with graceful fallback
 - The Vite config includes a custom plugin that resolves Figma asset paths; SVG and CSV are treated as static assets

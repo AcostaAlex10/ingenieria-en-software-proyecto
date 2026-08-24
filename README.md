@@ -1,107 +1,129 @@
 # SGSO — Sistema de Gestión y Seguimiento Operativo de Obras
 
-Proyecto académico (IC-413 Ingeniería del Software I, UNaM — Grupo 2).
-Alcance del sprint: **RF01** (registrar/modificar/eliminar proyectos) y **RF02**
-(información independiente por obra). Este README cubre además el **login**
-(autenticación con usuario/contraseña, base para RF19 — roles y permisos).
+Aplicación web para que una empresa constructora centralice la gestión de sus obras:
+proyectos, planificación, avance físico, materiales, maquinaria, documentación,
+reportes y alertas de desvío.
 
-## Stack
-
-| Capa | Tecnología |
-|---|---|
-| Frontend (SPA) | React + Vite + TypeScript (carpeta `FRONT/`) |
-| Backend (API REST) | Node.js + Express + TypeScript (carpeta `BACK/`) |
-| Base de datos | MariaDB / MySQL |
-| Autenticación | Contraseña hasheada con **bcryptjs** + **JWT** |
-
-## Requisitos previos
-
-- **Node.js** (LTS). El instalador está en `Intalar/node-v24.16.0-x64.msi`, o bajalo de [nodejs.org](https://nodejs.org).
-- **MariaDB** corriendo localmente (también funciona con MySQL: el SQL usa solo
-  sintaxis compatible con ambos). Verificado sobre **MariaDB 12.3**. Se puede
-  administrar con **DBeaver**.
-
-> **Puerto de la base:** MariaDB usa por defecto el puerto **3306**. Si la
-> instalaste en otro puerto para convivir con un MySQL ya existente (ej. **3307**),
-> ajustá `DB_PORT` en `BACK/.env` acorde.
+Proyecto académico de **IC-413 — Ingeniería del Software I** (UNaM, Facultad de
+Ingeniería, 2026), Grupo 2. El contexto completo del sistema, los requerimientos y
+la trazabilidad con los trabajos prácticos están en **[DOCUMENTACION.md](DOCUMENTACION.md)**.
 
 ---
 
-## 1) Base de datos
+## Arquitectura
 
-1. Crear una base llamada **`sgso`** (en DBeaver: clic derecho en la conexión → *Create New Database*).
-2. Ejecutar las migraciones **en orden**, desde un SQL Editor sobre `sgso`:
-   - `BACK/migrations/001_planificacion.sql` — tablas `usuario`, `proyecto`, `planificacion`, `avance_fisico`.
-   - `BACK/migrations/002_auth.sql` — ajustes para el login (campo `fecha_creacion` y limpieza del seed inseguro).
+| Pieza | Carpeta | Tecnología | Estado |
+|---|---|---|---|
+| Frontend (SPA) | `FRONT/` | React 18 + Vite 6 + TypeScript, Tailwind v4, shadcn/ui | Desplegado en Vercel |
+| Backend (API REST) | `back/` | **PHP 8** sin framework, PDO | Desplegado en Render (Docker) |
+| Base de datos | `back/sql/` | MariaDB / MySQL | Desplegada en Aiven |
+| Backend alternativo | `back-node/` | Node.js + Express + TypeScript | **No desplegado** |
 
-> **Seguridad:** la columna `usuario.contrasena` guarda el **hash bcrypt**, nunca
-> la contraseña en texto plano. El usuario admin de prueba **no** se inserta con
-> contraseña en el SQL; se crea con el seed del backend (paso siguiente).
+> **Cuál es el backend del proyecto:** el de `back/` (PHP). La cátedra exige PHP sobre
+> MariaDB, y es el que está desplegado y conectado al frontend. `back-node/` es una
+> implementación equivalente en Node que quedó como alternativa histórica: no se
+> despliega y no debe usarse para la entrega. Si tocás endpoints, tocá `back/`.
 
 ---
 
-## 2) Backend (`BACK/`)
+## Cómo levantarlo en local
+
+### 1) Base de datos
+
+Crear una base `sgso` en MariaDB o MySQL y cargar el esquema:
 
 ```bash
-cd BACK
-npm install                 # instala dependencias (incluye bcryptjs y jsonwebtoken)
-cp .env.example .env        # configurar credenciales de DB y JWT_SECRET
-npm run seed                # crea el usuario admin de prueba con contraseña hasheada
-npm run dev                 # levanta la API en http://localhost:3000
+mysql -u root -p sgso < back/sql/schema.sql
 ```
 
-Variables de entorno (`.env`):
+El esquema crea las 17 tablas del modelo (usuario, proyecto, planificacion,
+etapa_planificacion, avance_fisico, asistencia, incidencia, material,
+asignacion_material, consumo_material, documento, reporte, periodo_inactividad,
+item_excedente, maquinaria, registro_maquinaria, falla_maquinaria).
+
+Alternativa desde PHP, útil para apuntar a la base remota: `php back/sql/migrar.php`.
+
+### 2) Backend PHP
+
+```bash
+cp back/.env.example back/.env
+php back/sql/seed.php
+php -S localhost:8000 -t back/public
+```
+
+`seed.php` crea el usuario administrador inicial con la contraseña hasheada.
+La API queda en `http://localhost:8000/api`.
+
+Variables de entorno (`back/.env`):
 
 | Variable | Descripción |
 |---|---|
-| `PORT` | Puerto de la API (3000) |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | Conexión a MariaDB |
-| `JWT_SECRET` | Clave secreta para firmar los tokens (cambiar por una larga) |
-| `JWT_EXPIRES_IN` | Validez del token (ej. `8h`) |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | Conexión a la base |
+| `DB_SSL` | `true` para bases en la nube (Aiven) |
+| `JWT_SECRET` | Clave para firmar los tokens de sesión |
+| `JWT_SEGUNDOS` | Validez del token en segundos (28800 = 8 h) |
+| `BREVO_API_KEY` / `BREVO_SENDER` | Envío del correo de recuperación de contraseña |
 
-### Endpoints de autenticación
-
-| Método | Ruta | Protección | Descripción |
-|---|---|---|---|
-| `POST` | `/api/auth/login` | pública | Recibe `{ email, contrasena }`, devuelve `{ token, usuario }` |
-| `POST` | `/api/auth/register` | solo `AdministradorSistema` | Crea un usuario nuevo (requiere token) |
-| `GET` | `/api/auth/me` | requiere token | Devuelve el usuario del token actual |
-
-Para llamar a una ruta protegida, enviar el header:
-`Authorization: Bearer <token>`.
-
-### Usuario de prueba (tras `npm run seed`)
-
-```
-email: admin@sgso.com
-pass:  admin123
-```
-
----
-
-## 3) Frontend (`FRONT/`)
+### 3) Frontend
 
 ```bash
 cd FRONT
-npm install --legacy-peer-deps   # --legacy-peer-deps es necesario por conflictos de peers
-npm run dev                       # levanta la SPA (Vite indica la URL, ej. http://localhost:5173)
+npm install --legacy-peer-deps
+npm run dev
 ```
 
-Opcional: crear `FRONT/.env` a partir de `.env.example` para cambiar la URL de la
-API (`VITE_API_URL`). Por defecto apunta a `http://localhost:3000/api`.
+`--legacy-peer-deps` es necesario por conflictos entre peer dependencies.
+Copiar `FRONT/.env.example` a `FRONT/.env` y ajustar `VITE_API_URL` si la API no
+está en la URL por defecto.
 
-### Cómo funciona el login en el front
-
-- `/login` es pública. El resto de las rutas están protegidas por `RequireAuth`:
-  si no hay token, redirige a `/login`.
-- Al iniciar sesión, el token y los datos del usuario se guardan en `localStorage`.
-- El botón de **cerrar sesión** está en el pie del menú lateral.
+No hay scripts de test ni de lint configurados.
 
 ---
 
-## Flujo de prueba rápido
+## API
 
-1. Levantar DB → ejecutar migraciones → `npm run seed` en `BACK`.
-2. `npm run dev` en `BACK` y en `FRONT`.
-3. Abrir el front, entrar con `admin@sgso.com` / `admin123`.
-4. Verificar que sin sesión cualquier ruta redirige a `/login`.
+Todas las rutas cuelgan de `/api`. La autenticación es por **JWT** en el header
+`Authorization: Bearer <token>`; las contraseñas se guardan hasheadas con bcrypt.
+
+| Recurso | Descripción |
+|---|---|
+| `/auth` | `login`, `register`, `me`, `olvide`, `restablecer` |
+| `/proyectos` | CRUD de obras y sus subrecursos: planificación, avances, asistencia, incidencias, materiales asignados, documentos, inactividad, ítems excedentes |
+| `/planificacion` | Planificación por obra, etapas y avance físico asociado |
+| `/materiales` | Catálogo de materiales y consumos |
+| `/maquinaria` | Equipos, registros de uso y fallas |
+| `/reportes` | Reportes operativos y su circuito de aprobación |
+| `/analisis` | Indicadores, comparativas y alertas de desvío |
+| `/usuarios` | Gestión de cuentas y roles |
+| `/health` | Health-check del servicio |
+
+### Roles
+
+| Rol | Puede |
+|---|---|
+| `AdministradorSistema` | Todo, incluida la gestión de cuentas y roles |
+| `PersonalAdministrativo` | Crear y editar obras, planificación, materiales; aprobar reportes |
+| `PersonalTecnico` | Registrar avance, asistencia, incidencias y consumos desde la obra |
+| `Gerente` | Consultar indicadores y reportes (sin carga operativa) |
+
+---
+
+## Estructura del repositorio
+
+```
+FRONT/          SPA React (páginas en src/app/components, rutas en src/app/routes.tsx)
+back/           API REST en PHP — backend del proyecto
+  public/       front controller (index.php) y .htaccess
+  src/          controladores, middleware de auth, acceso a datos
+  sql/          schema.sql, migrar.php, seed.php
+back-node/      API equivalente en Node/Express (no desplegada)
+Intalar/        instalador de Node y comandos de ayuda para el equipo
+```
+
+## Documentación
+
+- **[DOCUMENTACION.md](DOCUMENTACION.md)** — contexto del sistema, requerimientos,
+  modelo de dominio, decisiones técnicas y trazabilidad con los TPs.
+- **[DEPLOY.md](DEPLOY.md)** — despliegue en la nube (Vercel + Render + Aiven).
+- **[DEPLOY-ONPREMISE.md](DEPLOY-ONPREMISE.md)** — despliegue en servidor propio.
+- **[CLAUDE.md](CLAUDE.md)** — guía para trabajar el repo con Claude Code.

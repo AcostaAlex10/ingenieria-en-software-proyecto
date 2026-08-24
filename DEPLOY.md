@@ -10,7 +10,7 @@ La app son **3 piezas** y cada una va a un servicio distinto:
 | Pieza | Servicio sugerido (gratis) | Notas |
 |---|---|---|
 | **Frontend** (React/Vite) | **Vercel** | Siempre activo. `vercel.json` ya incluido para el ruteo del SPA. |
-| **Backend** (Node/Express) | **Render** (Web Service free) | El plan free "duerme" tras ~15 min sin uso y tarda unos segundos en despertar. |
+| **Backend** (PHP + Apache) | **Render** (Web Service free, tipo **Docker**) | Usa `back/Dockerfile`. El plan free "duerme" tras ~15 min sin uso y tarda unos segundos en despertar. |
 | **Base de datos** (MySQL/MariaDB) | **Aiven** o **Clever Cloud** (MySQL gratis) | El SQL es compatible MySQL/MariaDB. |
 
 > Todo se despliega desde la rama del repo en GitHub. Conviene mergear primero a `main`.
@@ -22,14 +22,11 @@ La app son **3 piezas** y cada una va a un servicio distinto:
 1. Crear una cuenta en un proveedor de **MySQL gratis** (ej. [Aiven](https://aiven.io) o [Clever Cloud](https://www.clever-cloud.com)).
 2. Crear una base MySQL. Anotar los datos de conexión: **host, puerto, usuario, contraseña, nombre de la base**.
 3. Cargar el esquema y el usuario admin **desde tu PC**, apuntando a la base remota:
-   - En `BACK/.env`, poner los datos de la base remota y `DB_SSL=true`.
+   - En `back/.env`, poner los datos de la base remota y `DB_SSL=true`.
    - Ejecutar:
      ```bash
-     cd BACK
-     npm install
-     npm run build
-     npm run migrate    # crea las tablas (idempotente)
-     npm run seed       # crea el usuario admin con contraseña hasheada
+     php back/sql/migrar.php   # crea las tablas (idempotente)
+     php back/sql/seed.php     # crea el usuario admin con contraseña hasheada
      ```
    - Volver a dejar tu `.env` local como estaba si seguís desarrollando contra tu base local.
 
@@ -39,9 +36,9 @@ La app son **3 piezas** y cada una va a un servicio distinto:
 
 1. En [Render](https://render.com) → **New → Web Service** → conectar el repo de GitHub.
 2. Configurar:
-   - **Root Directory**: `BACK`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
+   - **Language / Runtime**: `Docker`
+   - **Root Directory**: `back`
+   - **Dockerfile Path**: `back/Dockerfile`
 3. En **Environment** cargar las variables (las mismas de `.env`, pero con los datos de la base remota):
 
    | Variable | Valor |
@@ -49,7 +46,8 @@ La app son **3 piezas** y cada una va a un servicio distinto:
    | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | los de la base en la nube |
    | `DB_SSL` | `true` |
    | `JWT_SECRET` | una clave larga y secreta |
-   | `JWT_EXPIRES_IN` | `8h` |
+   | `JWT_SEGUNDOS` | `28800` (8 horas) |
+   | `BREVO_API_KEY` / `BREVO_SENDER` | credenciales para el correo de recuperación de contraseña |
    | `CORS_ORIGIN` | *(se completa en el Paso 4)* |
 
 4. Deploy. Render da una URL tipo `https://sgso-backend.onrender.com`. Probar `https://.../api/health` → debe responder `{"status":"ok"}`.
@@ -84,8 +82,14 @@ La app son **3 piezas** y cada una va a un servicio distinto:
 
 - [ ] `https://.../api/health` responde OK.
 - [ ] Abrir la URL de Vercel → redirige a `/login`.
-- [ ] Login con `admin@sgso.com` / `admin123` → entra al dashboard.
-- [ ] El backend solo acepta llamadas desde el dominio del frontend (CORS).
+- [ ] Login con el usuario creado por `seed.php` → entra al dashboard.
+- [ ] El frontend consume la API de Render sin errores de CORS.
 
-> **Nota para la cátedra:** si exigen MariaDB estricto, el mismo procedimiento sirve
-> con un proveedor de MariaDB gestionada; el código no cambia (driver `mysql2`).
+> **CORS:** `back/src/Cors.php` devuelve el `Origin` de la petición y solo usa
+> `CORS_ORIGIN` cuando la petición no trae `Origin`. Es decir, hoy la API responde
+> a cualquier origen. Para restringirla de verdad hay que validar el `Origin`
+> recibido contra `CORS_ORIGIN` antes de reflejarlo.
+
+> **Nota para la cátedra:** el backend es PHP sobre MariaDB, como exige la
+> asignatura. La base de Aiven puede ser MySQL o MariaDB: el esquema usa solo
+> sintaxis compatible con ambas y el acceso a datos es por PDO.

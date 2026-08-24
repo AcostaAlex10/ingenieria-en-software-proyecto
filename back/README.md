@@ -1,51 +1,87 @@
-# Backend - Gestión de Proyectos (RF01)
+# Backend SGSO — API REST en PHP
 
-API REST en PHP plano (sin framework) para el CRUD de Proyecto:
-registrar, modificar, eliminar y listar (CU1, CU2, CU3 del TP3).
+API REST en PHP plano (sin framework, acceso a datos con PDO) sobre MariaDB / MySQL.
+Es el backend del proyecto: el que está desplegado en Render y el que consume el
+frontend. La alternativa en Node de `../back-node/` no se despliega.
 
-Por ahora los datos se guardan en `data/proyectos.json` en lugar de
-MariaDB. Ver la sección "Cuando llegue MariaDB" más abajo.
+Para el contexto del sistema ver [`../DOCUMENTACION.md`](../DOCUMENTACION.md);
+para levantar todo el stack, [`../README.md`](../README.md).
 
 ## Requisitos
 
-- PHP 8.1 o superior (usa `readonly`/`match`, sintaxis de PHP 8).
-- No hace falta Composer ni ninguna librería externa.
+- PHP 8.1 o superior (usa `readonly` y `match`).
+- Extensión PDO con driver MySQL.
+- No hace falta Composer ni librerías externas.
 
 ## Cómo levantarlo
 
 ```bash
-cd back
+cp .env.example .env      # datos de la base, JWT_SECRET, credenciales de Brevo
+php sql/migrar.php        # crea las tablas (idempotente)
+php sql/seed.php          # crea el usuario administrador inicial
 php -S localhost:8000 -t public
 ```
 
-La API queda disponible en `http://localhost:8000`.
+La API queda en `http://localhost:8000/api`. Con Apache o XAMPP, el
+`public/.htaccess` ya trae la reescritura para que todo pase por `index.php`.
 
-Si en algún momento usan Apache/XAMPP en vez del servidor embebido,
-ya está el `public/.htaccess` con la reescritura necesaria para que
-todo pase por `index.php`.
+## Estructura
 
-## Primer uso / reset de datos
-
-`data/proyectos.json` es el archivo "vivo" (está en `.gitignore`, no
-se sube a git). Si no existe, `JsonProyectoRepository` lo crea vacío
-solo. Si quieren arrancar con los 3 proyectos de ejemplo que ya
-conocen del prototipo de Figma:
-
-```bash
-cp data/proyectos.seed.json data/proyectos.json
+```
+back/
+  public/
+    index.php     <- único punto de entrada: parsea la ruta, valida el token y delega
+    .htaccess     <- reescritura para Apache
+  src/
+    Env.php, Cors.php, Database.php     <- configuración, CORS y conexión PDO
+    Jwt.php, AuthMiddleware.php         <- emisión y validación de tokens
+    Mailer.php                          <- correo de recuperación (Brevo)
+    Geocoder.php                        <- geocodificación de la ubicación de la obra
+    *Controller.php                     <- un controlador por recurso
+  sql/
+    schema.sql    <- modelo relacional (17 tablas)
+    migrar.php    <- aplica schema.sql
+    seed.php      <- usuario administrador inicial
+  data/
+    proyectos.seed.json   <- datos de ejemplo del prototipo (ya no se usan en runtime)
 ```
 
-## Endpoints
+## Autenticación y roles
+
+El login devuelve un **JWT** que hay que enviar en `Authorization: Bearer <token>`.
+Las contraseñas se guardan hasheadas con bcrypt, nunca en texto plano.
+
+Los grupos de roles autorizados están declarados como constantes al inicio de
+`public/index.php`: `ROLES_GESTION_OBRA`, `ROLES_AVANCE`, `ROLES_DOC`,
+`ROLES_REPORTE_APROBAR` y `ROLES_ADMIN`.
+
+| Método | Ruta | Protección |
+|---|---|---|
+| POST | `/api/auth/login` | pública |
+| POST | `/api/auth/olvide` | pública |
+| POST | `/api/auth/restablecer` | pública |
+| POST | `/api/auth/register` | solo `AdministradorSistema` |
+| GET | `/api/auth/me` | requiere token |
+| GET | `/api/health` | pública |
+
+## Recursos
+
+`proyectos`, `planificacion`, `materiales`, `maquinaria`, `reportes`, `analisis`
+y `usuarios`. Bajo `proyectos/{id}` cuelgan además los subrecursos de
+planificación, avances, asistencia, incidencias, materiales asignados,
+documentos, períodos de inactividad e ítems excedentes.
+
+### Ejemplo: CRUD de proyectos (CU1, CU2, CU3)
 
 | Método | Ruta | Acción | Caso de uso |
 |---|---|---|---|
-| GET | `/api/proyectos` | Listar (`?q=texto` para buscar por nombre/ubicación) | - |
-| GET | `/api/proyectos/{id}` | Ver uno | - |
+| GET | `/api/proyectos` | Listar (`?q=texto` busca por nombre o ubicación) | — |
+| GET | `/api/proyectos/{id}` | Ver uno | — |
 | POST | `/api/proyectos` | Registrar | CU1 |
 | PUT | `/api/proyectos/{id}` | Modificar | CU2 |
 | DELETE | `/api/proyectos/{id}` | Eliminar | CU3 |
 
-Body esperado en POST/PUT (JSON):
+Body esperado en POST y PUT:
 
 ```json
 {
@@ -58,80 +94,25 @@ Body esperado en POST/PUT (JSON):
 }
 ```
 
-Campos obligatorios: `nombre`, `tipo`, `ubicacion`, `encargado`,
-`fechaInicio`, `presupuesto`. Si falta alguno, responde `422` con:
+Todos los campos son obligatorios. Si falta alguno responde `422` con
+`{ "errors": { "nombre": "Obligatorio" } }`. Si ya existe un proyecto con el mismo
+`nombre` y `ubicacion` responde `409` con `{ "error": "Obra ya existente" }`.
 
-```json
-{ "errors": { "nombre": "Obligatorio" } }
-```
-
-Si ya existe un proyecto con el mismo `nombre` + `ubicacion`,
-responde `409`:
-
-```json
-{ "error": "Obra ya existente" }
-```
-
-## Probarlo con curl, antes de tocar el frontend
+## Probarlo con curl
 
 ```bash
-# Listar
-curl http://localhost:8000/api/proyectos
-
-# Registrar
-curl -X POST http://localhost:8000/api/proyectos \
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"Escuela N12","tipo":"Construcción Edilicia","ubicacion":"Eldorado, Misiones","encargado":"Ing. Test","fechaInicio":"2026-06-01","presupuesto":5000000}'
+  -d '{"email":"...","contrasena":"..."}' | jq -r .token)
 
-# Modificar (reemplazar 4 por el id que devolvió el POST anterior)
-curl -X PUT http://localhost:8000/api/proyectos/4 \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"Escuela N12","tipo":"Construcción Edilicia","ubicacion":"Eldorado, Misiones","encargado":"Ing. Test","fechaInicio":"2026-06-01","presupuesto":5500000}'
-
-# Eliminar
-curl -X DELETE http://localhost:8000/api/proyectos/4
+curl http://localhost:8000/api/proyectos -H "Authorization: Bearer $TOKEN"
 ```
 
-## Estructura
+## Notas del modelo
 
-```
-back/
-  public/
-    index.php       <- único punto de entrada, routing por método+URL
-    .htaccess       <- solo necesario si se usa Apache
-  src/
-    Cors.php
-    ProyectoRepositoryInterface.php   <- contrato del repositorio
-    JsonProyectoRepository.php       <- implementación temporal (JSON)
-    ProyectoController.php           <- validaciones + respuestas HTTP
-  data/
-    proyectos.seed.json   <- se versiona, datos de ejemplo
-    proyectos.json        <- NO se versiona, es el "vivo"
-```
-
-## Cuando llegue MariaDB
-
-Crear `src/MySqlProyectoRepository.php` implementando
-`ProyectoRepositoryInterface` con PDO, y cambiar en `public/index.php`
-la línea:
-
-```php
-$repositorio = new JsonProyectoRepository($rutaArchivoDatos);
-```
-
-por:
-
-```php
-$repositorio = new MySqlProyectoRepository($conexionPdo);
-```
-
-`ProyectoController` no cambia. Ahí también hay que resolver:
-- El mapeo snake_case (columnas de la tabla, ej. `fecha_inicio`) a
-  camelCase (lo que espera el frontend, `fechaInicio`).
-- `encargado` hoy es un string suelto; en el modelo relacional del
-  TP3 es un `id_responsable` que apunta a `USUARIO`, así que va a
-  necesitar un JOIN para devolver el nombre.
-- `avance` en el diagrama de clases del TP3 no es un campo de
-  `Proyecto`, se calcula a partir de `AVANCE_FISICO`. Por ahora se
-  guarda como campo plano para no bloquear el desarrollo de este
-  módulo.
+- Las columnas usan snake_case (`fecha_inicio`) y el frontend espera camelCase
+  (`fechaInicio`); el mapeo lo resuelve `MySqlProyectoRepository`.
+- `proyecto.encargado` es un texto libre. En el modelo relacional del TP3 estaba
+  previsto como una referencia a `usuario`; la normalización quedó pendiente.
+- `proyecto.avance` se guarda como campo plano aunque en el diagrama de clases del
+  TP3 se calcula a partir de `avance_fisico`.
