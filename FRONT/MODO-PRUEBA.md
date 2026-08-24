@@ -75,19 +75,43 @@ sgsoMockReset()
 Si agregás un endpoint al backend PHP, agregá su equivalente en `servidor.ts` o
 el modo de prueba responderá 404 en esa ruta.
 
-## Publicación en GitHub Pages
+## Publicación del sitio de prueba
 
-El workflow `.github/workflows/pages-testing.yml` compila con `VITE_MOCK=1` y
-publica en Pages. Solo corre en la rama `testing`, así que `main` y el
-despliegue de Vercel no se ven afectados.
+### Vercel (en uso)
 
-Configuración necesaria una sola vez en el repositorio:
+El repositorio es privado, y GitHub Pages no está disponible para repositorios
+privados con el plan actual. El sitio de prueba se publica como **preview de
+Vercel** de la rama `testing`, que sí funciona con repositorios privados y no
+requiere configuración adicional en el código: en Vercel el sitio vive en la
+raíz del dominio y `vercel.json` ya resuelve el ruteo de la SPA.
 
-1. **Settings → Pages → Source**: `GitHub Actions`.
-2. **Settings → Environments → `github-pages` → Deployment branches**: agregar
-   `testing`. Sin esto el deploy falla por política del entorno.
+Configuración en el proyecto de Vercel:
 
-El sitio queda en `https://<usuario>.github.io/<repo>/`. El workflow define
-`BASE_PATH` para que Vite compile con esa ruta base, copia `index.html` como
-`404.html` (Pages no reescribe rutas como hace `vercel.json`) y agrega
-`.nojekyll`.
+1. **Settings → Environment Variables**: agregar `VITE_MOCK` con valor `1`,
+   marcando únicamente el entorno **Preview**. No marcar Production: eso
+   convertiría el sitio de la demo en datos ficticios.
+2. **Deployments**: buscar el deployment de la rama `testing` y usar
+   **Redeploy**, para que tome la variable.
+
+La URL resultante tiene la forma
+`https://<proyecto>-git-testing-<usuario>.vercel.app`.
+
+### GitHub Pages (en pausa)
+
+El workflow `.github/workflows/pages-testing.yml` queda preparado pero con el
+disparador automático desactivado, porque el paso de despliegue falla mientras
+el repositorio sea privado. El job de compilación funciona correctamente.
+
+Para reactivarlo hay que hacer público el repositorio y seguir los pasos que el
+propio workflow documenta. Antes de hacerlo público conviene cambiar la
+contraseña del usuario administrador, que está escrita en `back/sql/seed.php` y
+es válida contra el sistema desplegado.
+
+### Sin publicar nada
+
+Para probar en la máquina, sin hosting ni backend:
+
+```bash
+cd FRONT
+VITE_MOCK=1 npm run dev
+```

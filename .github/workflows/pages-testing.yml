@@ -4,14 +4,26 @@ name: Publicar sitio de prueba (GitHub Pages)
 # sin base de datos y con datos ficticios. Solo corre en la rama `testing`, asi
 # que `main` y el despliegue de Vercel no se ven afectados.
 #
-# Requisito de una sola vez en el repositorio:
-#   1. Settings -> Pages -> Source: "GitHub Actions".
-#   2. Settings -> Environments -> github-pages -> Deployment branches:
+# ESTADO: en pausa. GitHub Pages no esta disponible en repositorios privados con
+# el plan actual, asi que el paso de despliegue falla con "Failed to create
+# deployment (status: 404) ... Ensure GitHub Pages has been enabled". El job de
+# compilacion si funciona.
+#
+# Por eso el disparador automatico esta desactivado y solo queda la ejecucion
+# manual: asi el workflow no falla en cada push. Para reactivarlo, hay que hacer
+# publico el repositorio (antes: cambiar la contrasena del administrador, que
+# esta escrita en back/sql/seed.php) y despues:
+#   1. Descomentar el bloque `push` de aca abajo.
+#   2. Settings -> Pages -> Source: "GitHub Actions".
+#   3. Settings -> Environments -> github-pages -> Deployment branches:
 #      agregar `testing`, o el deploy falla por politica del entorno.
+#
+# Mientras tanto, el sitio de prueba se publica como preview de Vercel en la
+# rama `testing`, con la variable de entorno VITE_MOCK=1. Ver FRONT/MODO-PRUEBA.md.
 
 on:
-  push:
-    branches: [testing]
+  # push:
+  #   branches: [testing]
   workflow_dispatch:
 
 permissions:
