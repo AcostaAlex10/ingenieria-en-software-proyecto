@@ -28,8 +28,13 @@ VITE_MOCK=1 npm run build    # sitio estático en dist/
 
 Sin esa variable, la aplicación se comporta igual que siempre y consume
 `VITE_API_URL`. El servidor simulado se carga con un import dinámico, así que
-**no entra en el bundle de producción**: queda en un chunk aparte que solo se
-descarga cuando el modo está activo.
+**no entra en el bundle principal**: queda en un chunk aparte que el navegador
+solo descarga cuando el modo está activo.
+
+Ese chunk igual se genera al compilar, con los datos adentro, y queda publicado
+junto al resto del sitio: no se ejecuta con el modo apagado, pero es accesible
+por su URL. Por eso en `datos.json` no van hashes de contraseña, tokens ni
+correos personales.
 
 ## Cuentas de prueba
 
@@ -49,10 +54,17 @@ presupuesto al `PersonalTecnico`.
 
 ## Datos
 
-Los datos base están en `src/app/mock/datos.json`: seis obras en distintos
-estados, planificaciones con etapas, avances, asistencias, incidencias,
-materiales con un consumo excedido, documentos, reportes en los cuatro estados,
-períodos de inactividad, ítems excedentes y maquinaria con registros y fallas.
+Los datos base están en `src/app/mock/datos.json`. Toman como punto de partida
+la información real de la base de producción —las cuatro obras con sus
+planificaciones, avances, materiales, maquinaria y reportes— y se completan con
+registros de prueba en lo que la base tenía vacío: asistencias, incidencias,
+documentos, períodos de inactividad e ítems excedentes. Se agregan además un
+cronograma completo para la Obra Vial Ruta 14, un consumo que excede lo asignado
+(RF12), reportes en los cuatro estados, los roles que la base no tiene y una
+cuenta dada de baja. Así queda cubierta cada pantalla del sistema.
+
+El inventario de lo que hay en la base, y su comparación con estos datos, está
+en `src/app/mock/DATOS-PRODUCCION.md`.
 
 Los cambios que hagas (crear una obra, registrar un avance) se guardan en
 `localStorage`, así que sobreviven a una recarga. Para volver al punto de

@@ -126,6 +126,45 @@ function usuarioDeToken(headers: Headers): Sesion | null {
 
 // ---------------------------------------------------------------- derivados
 
+/** Fecha YYYY-MM-DD a milisegundos UTC, ignorando la hora. */
+function dia(iso: string): number {
+  const [a, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+  return Date.UTC(a, (m || 1) - 1, d || 1);
+}
+
+/** Hoy en la misma escala que dia(), reutilizando la fecha que ya usa el resto del simulador. */
+function hoyEnDias(): number {
+  return dia(hoy());
+}
+
+/**
+ * Avance esperado a la fecha, igual que EtapaPlanificacionController::
+ * calcularEsperadoHoy() en el backend real: cada etapa aporta su peso segun
+ * la fraccion de su plazo ya transcurrida. Si la planificacion no tiene
+ * etapas se usa avance_esperado_total como valor de reserva.
+ */
+function esperadoDe(idPlan: number, fallback: number): number {
+  const etapas = db.etapas
+    .filter((e) => Number(e.id_planificacion) === idPlan)
+    .sort((a, b) => num(a.orden) - num(b.orden) || num(a.id_etapa) - num(b.id_etapa));
+  if (!etapas.length) return fallback;
+
+  const ahora = hoyEnDias();
+  const total = etapas.reduce((suma, e) => {
+    const inicio = dia(String(e.fecha_inicio));
+    const fin = dia(String(e.fecha_fin));
+    const duracion = fin - inicio;
+    const fraccion =
+      duracion <= 0
+        ? ahora >= fin
+          ? 1
+          : 0
+        : Math.max(0, Math.min(1, (ahora - inicio) / duracion));
+    return suma + fraccion * num(e.peso_porcentual);
+  }, 0);
+  return redondear(total);
+}
+
 function consumidoDe(idAsignacion: number): number {
   return db.consumos
     .filter((c) => Number(c.id_asignacion) === idAsignacion)
@@ -156,7 +195,7 @@ function resumenDe(idPlan: number) {
   const plan = db.planificaciones.find((p) => Number(p.id_planificacion) === idPlan);
   const avances = db.avances.filter((a) => Number(a.id_planificacion) === idPlan);
   const real = avances.reduce((max, a) => Math.max(max, num(a.porcentaje_avance)), 0);
-  const esperado = num(plan?.avance_esperado_total);
+  const esperado = esperadoDe(idPlan, num(plan?.avance_esperado_total));
   const fechas = avances.map((a) => String(a.fecha)).sort();
   return {
     avance_esperado: esperado,
@@ -189,7 +228,9 @@ function analisis(rol: string) {
   const proyectos = db.proyectos.map((p) => {
     const plan = db.planificaciones.find((pl) => String(pl.id_proyecto) === String(p.id));
     const real = num(p.avance);
-    const esperado = plan ? num(plan.avance_esperado_total) : null;
+    const esperado = plan
+      ? esperadoDe(Number(plan.id_planificacion), num(plan.avance_esperado_total))
+      : null;
     const excedidos = asignacionesDe(Number(p.id)).filter((a) => a.excedido).length;
     const fila: Record<string, unknown> = {
       id_proyecto: Number(p.id),
