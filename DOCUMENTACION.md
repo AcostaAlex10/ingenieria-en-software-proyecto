@@ -215,14 +215,10 @@ aceptación formales.
    equivocado o de que ambos se desincronicen.
 3. **Migraciones duplicadas.** `back/sql/schema.sql` y `back-node/migrations/`
    describen el mismo modelo por separado; solo el primero es el vigente.
-4. **CORS abierto.** `back/src/Cors.php` refleja el `Origin` de la petición y solo
-   usa `CORS_ORIGIN` cuando la petición no trae ninguno, de modo que la API
-   responde a cualquier origen. Para restringirla hay que validar el `Origin`
-   recibido contra el configurado antes de devolverlo.
-5. **Normalización pendiente.** `proyecto.encargado` es texto libre en lugar de una
+4. **Normalización pendiente.** `proyecto.encargado` es texto libre en lugar de una
    referencia a `usuario`, y `proyecto.avance` se guarda como campo plano en vez de
    calcularse a partir de `avance_fisico`, como preveía el diagrama de clases del TP3.
-6. **Documentación por módulo.** Los módulos agregados después del TP4 no tienen
+5. **Documentación por módulo.** Los módulos agregados después del TP4 no tienen
    criterios de aceptación escritos.
 
 ---
@@ -241,3 +237,9 @@ aceptación formales.
 - La zona horaria del backend se fija en `America/Argentina/Buenos_Aires`, porque
   el servidor de Render corre en UTC y las validaciones de fecha dependen de la
   fecha local.
+- `back/src/Cors.php` valida el `Origin` recibido contra una lista blanca antes de
+  reflejarlo; si no figura, no se envía `Access-Control-Allow-Origin` y el navegador
+  bloquea la respuesta. La lista combina los orígenes por defecto del archivo
+  (producción, previews de Vercel por rama y `localhost`) con lo que se agregue en
+  la variable `CORS_ORIGIN`, separando varios valores por coma. Acepta comodines
+  (`https://*-acostaalex10.vercel.app`) para los dominios que Vercel genera por rama.
