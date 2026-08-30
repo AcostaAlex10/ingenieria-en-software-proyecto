@@ -115,6 +115,28 @@ Sin ellas, `npm run build` produce exactamente el mismo resultado de siempre.
 > interpreta como referencias a la coincidencia y sustituye en silencio,
 > corrompiendo el JS. El script ya lo hace.
 
+### Sitio portable para GitHub Pages
+
+Compilado así, el sitio funciona en **cualquier subdirectorio** sin conocer de
+antemano el nombre del repositorio, y sin necesidad de `404.html`:
+
+```bash
+cd FRONT
+BASE_PATH=./ VITE_MOCK=1 VITE_HASH_ROUTER=1 npm run build
+```
+
+| Variable | Para qué |
+|---|---|
+| `BASE_PATH=./` | rutas relativas a los assets, así el sitio no depende de la ruta donde se publique |
+| `VITE_HASH_ROUTER=1` | las rutas viajan en el fragmento, así recargar en `#/proyectos` no da 404 |
+| `VITE_MOCK=1` | resuelve las peticiones contra el simulador |
+
+El contenido de `dist/` se puede subir tal cual a la raíz de un repositorio
+público con Pages habilitado (Source: rama `main`, carpeta `/`).
+
+Verificado sirviendo `dist/` desde un subdirectorio: carga, login, navegación y
+recarga profunda en `#/proyectos` sin errores.
+
 ### Vercel (en uso)
 
 El repositorio es privado, y GitHub Pages no está disponible para repositorios
