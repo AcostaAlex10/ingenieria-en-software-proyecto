@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, createHashRouter } from "react-router";
 import Root from "./components/Root";
 import LoginPage from "./components/LoginPage";
 import OlvidePage from "./components/OlvidePage";
@@ -23,7 +23,16 @@ const BASENAME = (
   (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/"
 ).replace(/\/$/, "");
 
-export const router = createBrowserRouter([
+// Con VITE_HASH_ROUTER=1 las rutas viajan en el fragmento (#/proyectos) en vez
+// del path. Sirve para abrir la demo desde un archivo suelto o un visor que no
+// puede devolver index.html en cada ruta; sin eso, entrar a /proyectos o
+// recargar da 404. En Vercel y en local se sigue usando el router normal.
+const USAR_HASH =
+  (import.meta as unknown as { env?: { VITE_HASH_ROUTER?: string } }).env?.VITE_HASH_ROUTER === "1";
+
+const crearRouter = USAR_HASH ? createHashRouter : createBrowserRouter;
+
+export const router = crearRouter([
   // Rutas publicas (sin sidebar/layout).
   { path: "/login", Component: LoginPage },
   { path: "/olvide", Component: OlvidePage },
@@ -50,4 +59,6 @@ export const router = createBrowserRouter([
       { path: "*", Component: NotFound },
     ],
   },
-], { basename: BASENAME || undefined });
+  // Con hash el prefijo del sitio queda antes del '#', asi que el router no
+  // debe volver a aplicarlo.
+], { basename: USAR_HASH ? undefined : BASENAME || undefined });

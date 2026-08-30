@@ -89,6 +89,32 @@ el modo de prueba responderá 404 en esa ruta.
 
 ## Publicación del sitio de prueba
 
+### Un solo archivo .html
+
+La demo también se puede empaquetar en un único `.html` con el CSS y el JS
+incrustados, para compartirla como archivo suelto o subirla a un visor que no
+sirve carpetas:
+
+```bash
+VITE_MOCK=1 VITE_HASH_ROUTER=1 ARCHIVO_UNICO=1 npm run build
+node scripts/demo-un-archivo.mjs   # deja dist/demo.html (~1 MB)
+```
+
+Las tres variables son necesarias y solo actúan en este build:
+
+| Variable | Para qué |
+|---|---|
+| `VITE_MOCK=1` | resuelve las peticiones contra el simulador, sin backend |
+| `VITE_HASH_ROUTER=1` | las rutas viajan en el fragmento (`#/proyectos`), así funcionan sin un servidor que devuelva `index.html` en cada ruta |
+| `ARCHIVO_UNICO=1` | desactiva la división en chunks, para que todo el JS entre en un bundle |
+
+Sin ellas, `npm run build` produce exactamente el mismo resultado de siempre.
+
+> Al incrustar el bundle hay que pasarlo como **función** de reemplazo, no como
+> cadena: el código minificado contiene secuencias como `$&`, que `replace()`
+> interpreta como referencias a la coincidencia y sustituye en silencio,
+> corrompiendo el JS. El script ya lo hace.
+
 ### Vercel (en uso)
 
 El repositorio es privado, y GitHub Pages no está disponible para repositorios

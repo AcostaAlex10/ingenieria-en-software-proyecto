@@ -39,4 +39,15 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+
+  build: {
+    rollupOptions: {
+      output: {
+        // Con ARCHIVO_UNICO=1 se desactiva la division en chunks y todo el JS
+        // sale en un bundle, para poder incrustarlo en un unico .html (ver
+        // scripts/demo-un-archivo.mjs). El resto de los builds no se altera.
+        ...(process.env.ARCHIVO_UNICO === '1' ? { inlineDynamicImports: true } : {}),
+      },
+    },
+  },
 })
