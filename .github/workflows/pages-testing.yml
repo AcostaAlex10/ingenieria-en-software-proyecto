@@ -1,29 +1,24 @@
 name: Publicar sitio de prueba (GitHub Pages)
 
 # Publica el frontend en modo de prueba estatico (VITE_MOCK=1): sin backend,
-# sin base de datos y con datos ficticios. Solo corre en la rama `testing`, asi
-# que `main` y el despliegue de Vercel no se ven afectados.
+# sin base de datos y con los datos de `FRONT/src/app/mock/datos.json`.
 #
-# ESTADO: en pausa. GitHub Pages no esta disponible en repositorios privados con
-# el plan actual, asi que el paso de despliegue falla con "Failed to create
-# deployment (status: 404) ... Ensure GitHub Pages has been enabled". El job de
-# compilacion si funciona.
+# No afecta al despliegue de Vercel: aquel compila sin VITE_MOCK y sigue
+# consumiendo la API PHP de Render.
 #
-# Por eso el disparador automatico esta desactivado y solo queda la ejecucion
-# manual: asi el workflow no falla en cada push. Para reactivarlo, hay que hacer
-# publico el repositorio (antes: cambiar la contrasena del administrador, que
-# esta escrita en back/sql/seed.php) y despues:
-#   1. Descomentar el bloque `push` de aca abajo.
-#   2. Settings -> Pages -> Source: "GitHub Actions".
-#   3. Settings -> Environments -> github-pages -> Deployment branches:
-#      agregar `testing`, o el deploy falla por politica del entorno.
+# Configuracion necesaria en el repositorio, una sola vez:
+#   Settings -> Pages -> Source: "GitHub Actions".
 #
-# Mientras tanto, el sitio de prueba se publica como preview de Vercel en la
-# rama `testing`, con la variable de entorno VITE_MOCK=1. Ver FRONT/MODO-PRUEBA.md.
+# Sin eso el despliegue falla con "Failed to create deployment (status: 404)
+# ... Ensure GitHub Pages has been enabled", aunque el job de compilacion pase.
+#
+# Corre en `main` y en `testing`. Incluir `main` evita tener que tocar la
+# politica de ramas del entorno `github-pages`, que por defecto solo admite
+# despliegues desde la rama por defecto.
 
 on:
-  # push:
-  #   branches: [testing]
+  push:
+    branches: [main, testing]
   workflow_dispatch:
 
 permissions:
@@ -53,14 +48,17 @@ jobs:
 
       - name: Compilar en modo de prueba
         env:
-          # En Pages el sitio vive en /<repo>/, no en la raiz del dominio.
-          BASE_PATH: /${{ github.event.repository.name }}/
+          # Rutas relativas: el sitio funciona bajo /<repo>/ sin depender del
+          # nombre del repositorio.
+          BASE_PATH: './'
+          # Las rutas viajan en el fragmento (#/proyectos), asi recargar una
+          # ruta interna no depende de que el hosting reescriba a index.html.
+          VITE_HASH_ROUTER: '1'
           VITE_MOCK: '1'
         run: npm run build
 
       - name: Fallback de rutas para la SPA
-        # Pages no reescribe como el vercel.json: sin esto, recargar en
-        # /proyectos devuelve 404.
+        # Red de seguridad por si alguien entra a una ruta sin fragmento.
         run: cp dist/index.html dist/404.html
 
       - name: Desactivar el procesado Jekyll
