@@ -150,35 +150,32 @@ público con Pages habilitado (Source: rama `main`, carpeta `/`).
 Verificado sirviendo `dist/` desde un subdirectorio: carga, login, navegación y
 recarga profunda en `#/proyectos` sin errores.
 
-### Vercel (en uso)
+### GitHub Pages (en uso)
 
-El repositorio es privado, y GitHub Pages no está disponible para repositorios
-privados con el plan actual. El sitio de prueba se publica como **preview de
-Vercel** de la rama `testing`, que sí funciona con repositorios privados y no
-requiere configuración adicional en el código: en Vercel el sitio vive en la
-raíz del dominio y `vercel.json` ya resuelve el ruteo de la SPA.
+El workflow `.github/workflows/pages-testing.yml` publica la demo en cada push a
+**`testing`**, que es la rama del sitio estático. Compila con las tres variables
+de arriba y el resultado queda en
 
-Configuración en el proyecto de Vercel:
+`https://acostaalex10.github.io/ingenieria-en-software-proyecto/`
 
-1. **Settings → Environment Variables**: agregar `VITE_MOCK` con valor `1`,
-   marcando únicamente el entorno **Preview**. No marcar Production: eso
-   convertiría el sitio de la demo en datos ficticios.
-2. **Deployments**: buscar el deployment de la rama `testing` y usar
-   **Redeploy**, para que tome la variable.
+**`main` no dispara este workflow.** Lleva la aplicación real, la que consume la
+API PHP. Pages sirve un único sitio por repositorio, así que si las dos ramas
+publicaran se pisarían entre sí.
 
-La URL resultante tiene la forma
-`https://<proyecto>-git-testing-<usuario>.vercel.app`.
+Requiere, una sola vez, **Settings → Pages → Source: "GitHub Actions"**. Ya está
+hecho; sin eso el despliegue falla con un 404 aunque la compilación pase.
 
-### GitHub Pages (en pausa)
+### Vercel
 
-El workflow `.github/workflows/pages-testing.yml` queda preparado pero con el
-disparador automático desactivado, porque el paso de despliegue falla mientras
-el repositorio sea privado. El job de compilación funciona correctamente.
+Despliega la aplicación real, sin `VITE_MOCK` y contra la API PHP de Render. Es
+un circuito aparte del de Pages y no comparte configuración con él.
 
-Para reactivarlo hay que hacer público el repositorio y seguir los pasos que el
-propio workflow documenta. Antes de hacerlo público conviene cambiar la
-contraseña del usuario administrador, que está escrita en `back/sql/seed.php` y
-es válida contra el sistema desplegado.
+Si alguna vez hiciera falta publicar la demo también en Vercel —por ejemplo con
+el repositorio en privado, donde Pages no está disponible— alcanza con agregar
+`VITE_MOCK` con valor `1` en **Settings → Environment Variables** marcando
+únicamente el entorno **Preview**, y redesplegar la rama para que tome la
+variable. No marcar Production: eso convertiría el sitio real en datos
+ficticios.
 
 ### Sin publicar nada
 

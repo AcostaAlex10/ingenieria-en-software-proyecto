@@ -46,7 +46,8 @@ git checkout testing
 | Demo estática | https://acostaalex10.github.io/ingenieria-en-software-proyecto/ | GitHub Pages, sin backend |
 
 La demo estática se publica sola con el workflow `.github/workflows/pages-testing.yml`
-en cada push a `main` o `testing`. Compila con `BASE_PATH=./`,
+en cada push a `testing`, que es la rama del sitio estático; `main` lleva la
+aplicación real y no republica la demo. Compila con `BASE_PATH=./`,
 `VITE_HASH_ROUTER=1` y `VITE_MOCK=1`, que es la combinación verificada sirviendo
 el sitio desde un subdirectorio.
 

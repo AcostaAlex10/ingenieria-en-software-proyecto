@@ -12,13 +12,14 @@ name: Publicar sitio de prueba (GitHub Pages)
 # Sin eso el despliegue falla con "Failed to create deployment (status: 404)
 # ... Ensure GitHub Pages has been enabled", aunque el job de compilacion pase.
 #
-# Corre en `main` y en `testing`. Incluir `main` evita tener que tocar la
-# politica de ramas del entorno `github-pages`, que por defecto solo admite
-# despliegues desde la rama por defecto.
+# Corre solo en `testing`, que es la rama del sitio estatico. `main` lleva la
+# aplicacion real (la SPA contra la API PHP, desplegada en Vercel) y no debe
+# republicar la demo: Pages sirve un unico sitio por repositorio, asi que si
+# ambas ramas publicaran se pisarian entre si.
 
 on:
   push:
-    branches: [main, testing]
+    branches: [testing]
   workflow_dispatch:
 
 permissions:
