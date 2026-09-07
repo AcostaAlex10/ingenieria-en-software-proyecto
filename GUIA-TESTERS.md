@@ -116,6 +116,15 @@ Dos comprobaciones concretas que valen la pena:
 | Maquinaria | uso de equipos, fallas y rendimiento por operario | RF23, RF24, RF27, RF28 |
 | Usuarios | alta de cuentas, roles y baja lógica | RF19, RF20 |
 
+Los códigos `RFxx` remiten a la tabla de requerimientos del **TP2**, que no forma
+parte de este repositorio: acá solo se los referencia. En el TP4 se implementó
+todo, y los principales son **RF01** y **RF03**, los dos de Gestión de Proyectos.
+
+Por eso, si hay que priorizar el esfuerzo de prueba, conviene empezar por la
+pantalla de **Proyectos**: salvo el catálogo de materiales, el de maquinaria y
+las cuentas de usuario, todo el resto del sistema cuelga de una obra ya
+registrada.
+
 ---
 
 ## 5. Reglas de negocio verificables
