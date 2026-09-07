@@ -12,7 +12,26 @@
  */
 import base from "./datos.json";
 
-const CLAVE_ALMACEN = "sgso_mock_db_v1";
+/**
+ * Hash FNV-1a de 32 bits, en base 36. No es criptografico: solo sirve para
+ * notar que `datos.json` cambio.
+ */
+function huella(texto: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < texto.length; i++) {
+    h ^= texto.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+const PREFIJO_ALMACEN = "sgso_mock_db_";
+// La clave lleva la huella de los datos base. Al publicar un `datos.json`
+// distinto cambia sola: la copia guardada en el navegador deja de encontrarse y
+// el tester arranca desde los datos nuevos en lugar de seguir con los viejos.
+// localStorage es por origen, no por version del sitio, asi que sin esto un
+// redespliegue no alcanza para que vea los datos corregidos.
+const CLAVE_ALMACEN = PREFIJO_ALMACEN + huella(JSON.stringify(base));
 const DEMORA_MS = 80;
 
 type Fila = Record<string, unknown>;
@@ -40,12 +59,23 @@ interface BaseDatos {
 
 function cargar(): BaseDatos {
   try {
+    purgarCopiasViejas();
     const guardado = localStorage.getItem(CLAVE_ALMACEN);
     if (guardado) return JSON.parse(guardado) as BaseDatos;
   } catch {
     /* almacenamiento no disponible: seguimos con los datos base */
   }
   return JSON.parse(JSON.stringify(base)) as BaseDatos;
+}
+
+/** Descarta las copias que quedaron de versiones anteriores de `datos.json`. */
+function purgarCopiasViejas(): void {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const clave = localStorage.key(i);
+    if (clave !== null && clave.startsWith(PREFIJO_ALMACEN) && clave !== CLAVE_ALMACEN) {
+      localStorage.removeItem(clave);
+    }
+  }
 }
 
 let db: BaseDatos = cargar();

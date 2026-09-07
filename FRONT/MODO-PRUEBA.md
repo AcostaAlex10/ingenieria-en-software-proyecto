@@ -74,6 +74,19 @@ partida, ejecutar en la consola del navegador:
 sgsoMockReset()
 ```
 
+### Publicar datos nuevos
+
+`localStorage` es por origen, no por versión del sitio: redesplegar no limpia
+nada. Sin más, quien ya hubiera entrado seguiría viendo su copia vieja de los
+datos, y si además cambió la forma de un registro esa copia queda inconsistente
+con el código nuevo.
+
+Por eso la clave de almacenamiento lleva un sufijo derivado de `datos.json`
+(`sgso_mock_db_<huella>`). Al publicar datos distintos la clave cambia sola, la
+copia guardada deja de encontrarse y cada persona arranca desde los datos
+nuevos; las copias anteriores se borran al cargar. No hay que acordarse de
+versionar nada a mano ni pedirle a nadie que limpie el navegador.
+
 ## Cómo se implementa
 
 - `src/app/mock/datos.json` — datos ficticios.
