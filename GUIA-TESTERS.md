@@ -106,24 +106,65 @@ Dos comprobaciones concretas que valen la pena:
 | Pantalla | Qué hace | Requerimientos |
 |---|---|---|
 | Panel de Control | indicadores globales: obras, avance promedio, presupuesto | RF05, RF06 |
-| Proyectos | alta, edición, baja y búsqueda de obras; filtro por estado | RF01, RF02, RF03, RF18 |
-| Detalle de obra | planificación por etapas, avance, y todo lo de esa obra | RF05, RF11, RF15 |
-| Seguimiento | asistencia del personal e incidencias externas | RF06, RF08, RF09 |
+| Proyectos | alta, edición, baja y búsqueda de obras; filtro por estado | RF01, RF02, RF18 |
+| Detalle de obra | planificación por etapas, avance, inactividad y excedentes de esa obra | RF03, RF05, RF11, RF15, RF22, RF25 |
+| Seguimiento | asistencia del personal e incidencias externas, con nivel de gravedad | RF06, RF08, RF09, RF26 |
 | Materiales | asignación por obra y registro de consumo | RF04, RF10, RF12 |
 | Documentación | documentos de la obra, guardados como enlace | RF07, RF16 |
-| Reportes | carga, revisión y aprobación de reportes | RF17, RF21, RF22 |
+| Reportes | carga, revisión y aprobación de reportes | RF14, RF17, RF21 |
 | Alertas | desvíos de avance y análisis presupuestario | RF11, RF13 |
 | Maquinaria | uso de equipos, fallas y rendimiento por operario | RF23, RF24, RF27, RF28 |
 | Usuarios | alta de cuentas, roles y baja lógica | RF19, RF20 |
 
-Los códigos `RFxx` remiten a la tabla de requerimientos del **TP2**, que no forma
-parte de este repositorio: acá solo se los referencia. En el TP4 se implementó
-todo, y los principales son **RF01** y **RF03**, los dos de Gestión de Proyectos.
+Los códigos `RFxx` son los del **TP2**, que está en el repositorio como
+`TrabajoPracticoN°2_Grupo2.pdf`. La tabla completa está acá abajo.
 
-Por eso, si hay que priorizar el esfuerzo de prueba, conviene empezar por la
-pantalla de **Proyectos**: salvo el catálogo de materiales, el de maquinaria y
-las cuentas de usuario, todo el resto del sistema cuelga de una obra ya
-registrada.
+En el TP4 se implementaron los veintiocho. Los dos principales son **RF01**
+—registrar, modificar y eliminar proyectos de obra— y **RF03** —cargar la
+planificación inicial con ítems, plazos esperados, avance proyectado y
+presupuestos—. Sin una obra registrada y planificada el resto del sistema no
+tiene sobre qué operar: salvo el catálogo de materiales, el de maquinaria y las
+cuentas de usuario, todo lo demás cuelga de una obra.
+
+Por eso conviene empezar a probar por **Proyectos** y por la planificación del
+**Detalle de obra**.
+
+### Requerimientos funcionales
+
+Transcritos del TP2. Se omite el "El sistema debe..." con que arranca cada uno;
+el resto es textual. La prioridad es la que fija ese documento, y sirve para
+ordenar el esfuerzo: los **críticos** son los que no pueden fallar.
+
+| ID | Requerimiento | Prioridad |
+|---|---|---|
+| RF01 | permitir registrar, modificar y eliminar proyectos de obra | Crítica |
+| RF02 | permitir organizar la información de manera independiente para cada obra o proyecto | Crítica |
+| RF03 | permitir cargar la planificación inicial de la obra, incluyendo ítems, plazos esperados, avance proyectado y presupuestos asociados | Crítica |
+| RF04 | permitir precargar listas de tareas y materiales con cantidades definidas para simplificar la carga de datos en obra | Importante |
+| RF05 | permitir registrar diariamente el avance físico de la obra utilizando métricas numéricas específicas | Crítica |
+| RF06 | permitir registrar la asistencia diaria del personal asignado a la obra | Importante |
+| RF07 | permitir adjuntar imágenes y reportes fotográficos relacionados con el avance de las tareas | Importante |
+| RF08 | permitir registrar justificaciones detalladas cuando no se cumpla el avance planificado o existan inasistencias | Importante |
+| RF09 | permitir registrar incidencias externas como lluvias, fallas de maquinaria o retrasos de proveedores | Importante |
+| RF10 | permitir asignar materiales a una obra y registrar el consumo realizado | Crítica |
+| RF11 | generar alertas automáticas cuando el avance real sea inferior al avance esperado planificado | Importante |
+| RF12 | generar alertas cuando se excedan las cantidades presupuestadas o los materiales asignados | Importante |
+| RF13 | calcular automáticamente la diferencia entre el presupuesto estimado y los gastos reales ejecutados | Importante |
+| RF14 | generar reportes comparativos entre el avance planificado y el avance ejecutado | Importante |
+| RF15 | traducir el porcentaje físico de avance de obra en montos monetarios para generar certificaciones | Secundaria |
+| RF16 | permitir almacenar y consultar documentación relacionada con proyectos en formatos PDF e imágenes | Importante |
+| RF17 | permitir registrar observaciones y comentarios asociados a reportes o incidencias | Secundaria |
+| RF18 | permitir consultar información histórica de proyectos finalizados | Secundaria |
+| RF19 | contar con distintos roles y permisos de acceso según el tipo de usuario | Crítica |
+| RF20 | impedir que usuarios de obra visualicen información sensible como costos o precios | Crítica |
+| RF21 | permitir revisar, editar y aprobar los reportes cargados antes de emitir informes definitivos | Importante |
+| RF22 | permitir registrar nuevos ítems o excedentes de obra no contemplados inicialmente | Secundaria |
+| RF23 | permitir registrar el rendimiento de equipos y maquinaria mediante horas de uso, consumo de combustible y producción realizada | Importante |
+| RF24 | comparar automáticamente el consumo de recursos con el rendimiento esperado y generar alertas cuando existan desvíos significativos | Importante |
+| RF25 | permitir registrar períodos de inactividad de obra indicando el motivo correspondiente | Importante |
+| RF26 | permitir clasificar incidencias según niveles de gravedad para activar diferentes protocolos de notificación | Secundaria |
+| RF27 | mantener un historial de fallas y reemplazos de componentes asociados a cada equipo o maquinaria | Importante |
+| RF28 | generar comparativas de rendimiento entre operarios utilizando métricas de producción registradas | Secundaria |
 
 ---
 
