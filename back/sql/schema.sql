@@ -32,7 +32,12 @@ CREATE TABLE IF NOT EXISTS proyecto (
   ubicacion    VARCHAR(255) NOT NULL,
   encargado    VARCHAR(150) NOT NULL,
   fecha_inicio DATE NOT NULL,
-  estado       VARCHAR(30) NOT NULL DEFAULT 'planificacion',
+  -- Los siete estados del ciclo de vida del TP3. Cuatro todavia no los asigna
+  -- ningun controlador (ver REVISION-TPS.md); el ENUM esta para que la base no
+  -- acepte un estado inventado mientras se cierran esos huecos.
+  estado       ENUM('creada','planificacion','en_ejecucion','pausada',
+                    'en_revision','finalizada','cancelada')
+               NOT NULL DEFAULT 'planificacion',
   avance       DECIMAL(5,2) NOT NULL DEFAULT 0,
   presupuesto  DECIMAL(15,2) NOT NULL
 );

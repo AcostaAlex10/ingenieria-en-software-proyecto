@@ -403,11 +403,14 @@ if ($recurso === 'proyectos') {
         exit;
     }
 
-    // /proyectos/inactividad/{id}  -> DELETE de un periodo de inactividad
+    // /proyectos/inactividad/{id}  -> cerrar (PUT) o eliminar (DELETE) un periodo
     if ($id === 'inactividad') {
         $idp = $segmentos[2] ?? null;
         if ($idp === null) { responder(404, ['error' => 'Falta el id de período']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $inactividad->eliminar($idp); }
+        // Cerrar el periodo reactiva la obra; eliminarlo tambien, pero pierde
+        // el registro que RF25 pide conservar.
+        if ($metodoHttp === 'PUT') { exigirRol($usuario, ROLES_DOC); $inactividad->cerrar($idp, leerCuerpoJson()); }
+        elseif ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $inactividad->eliminar($idp); }
         else { responder(405, ['error' => 'Metodo no permitido']); }
         exit;
     }

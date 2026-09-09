@@ -30,7 +30,7 @@ export default function AlertasPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><AlertTriangle className="w-7 h-7" /> Análisis y Alertas</h2>
-        <p className="text-muted-foreground mt-2">Desvíos de avance (RF11) y análisis presupuestario (RF13).</p>
+        <p className="text-muted-foreground mt-2">Desvíos de avance y análisis presupuestario.</p>
       </div>
 
       {/* Feed de alertas activas */}
@@ -58,7 +58,7 @@ export default function AlertasPage() {
       {/* Análisis de avance (RF11) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><TrendingDown className="w-5 h-5" /> Avance esperado vs. real (RF11)</CardTitle>
+          <CardTitle className="flex items-center gap-2"><TrendingDown className="w-5 h-5" /> Avance esperado vs. real</CardTitle>
           <CardDescription>Obras con planificación cargada.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -88,7 +88,7 @@ export default function AlertasPage() {
       {verCostos && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Presupuesto vs. ejecutado (RF13)</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Wallet className="w-5 h-5" /> Presupuesto vs. ejecutado</CardTitle>
             <CardDescription>
               Gasto ejecutado estimado según el avance físico. "Base plan." es la suma del presupuesto base de las etapas planificadas.
             </CardDescription>

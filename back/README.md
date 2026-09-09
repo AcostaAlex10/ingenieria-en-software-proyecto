@@ -19,6 +19,10 @@ para levantar todo el stack, [`../README.md`](../README.md).
 cp .env.example .env      # datos de la base, JWT_SECRET, credenciales de Brevo
 php sql/migrar.php        # crea las tablas (idempotente)
 php sql/seed.php          # crea el usuario administrador inicial
+
+# Sobre una base que YA existe, migrar.php no cambia columnas: sus tablas usan
+# CREATE TABLE IF NOT EXISTS. Los cambios de tipo van en scripts aparte:
+php sql/migracion-estado-enum.php   # proyecto.estado: VARCHAR -> ENUM
 php -S localhost:8000 -t public
 ```
 
@@ -40,7 +44,8 @@ back/
     *Controller.php                     <- un controlador por recurso
   sql/
     schema.sql    <- modelo relacional (17 tablas)
-    migrar.php    <- aplica schema.sql
+    migrar.php    <- aplica schema.sql (solo crea lo que falte)
+    migracion-estado-enum.php  <- altera proyecto.estado en bases ya creadas
     seed.php      <- usuario administrador inicial
   data/
     proyectos.seed.json   <- datos de ejemplo del prototipo (ya no se usan en runtime)

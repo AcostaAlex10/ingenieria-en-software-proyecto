@@ -14,6 +14,7 @@ import {
   type Proyecto, type ProyectoInput,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeVerCostos } from "../auth/permisos";
+import { etiquetaEstado } from "../estadosObra";
 
 const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "" };
 
@@ -25,12 +26,16 @@ const HOY = (() => {
 })();
 const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
+// La etiqueta sale de estadosObra.ts; aca solo se elige el color por estado.
 function estadoBadge(estado: string) {
+  const etiqueta = etiquetaEstado(estado);
   switch (estado) {
-    case "en_ejecucion": return <Badge className="bg-green-600">En Ejecución</Badge>;
-    case "pausada": return <Badge variant="destructive">Pausada</Badge>;
-    case "finalizada": return <Badge variant="outline">Finalizada</Badge>;
-    default: return <Badge variant="secondary">Planificación</Badge>;
+    case "en_ejecucion": return <Badge className="bg-green-600">{etiqueta}</Badge>;
+    case "pausada": return <Badge variant="destructive">{etiqueta}</Badge>;
+    case "en_revision": return <Badge className="bg-amber-600">{etiqueta}</Badge>;
+    case "finalizada":
+    case "cancelada": return <Badge variant="outline">{etiqueta}</Badge>;
+    default: return <Badge variant="secondary">{etiqueta}</Badge>;
   }
 }
 

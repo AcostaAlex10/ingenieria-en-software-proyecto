@@ -97,7 +97,7 @@ export default function UsuariosPage() {
           <Users className="w-7 h-7" /> Gestión de Usuarios
         </h2>
         <p className="text-muted-foreground mt-2">
-          Alta de cuentas, asignación de roles y baja lógica (RF19).
+          Alta de cuentas, asignación de roles y baja lógica.
         </p>
       </div>
 

@@ -16,8 +16,19 @@ Env::cargar(__DIR__ . '/../.env');
 $db = Database::conexion();
 
 // --- Usuario administrador ---
-$email = 'admin@sgso.com';
-$hash = password_hash('admin123', PASSWORD_BCRYPT);
+// La contrasena NO se escribe en el codigo: el repositorio es publico y
+// cualquiera podria usarla contra el sistema desplegado. Se toma del entorno.
+$email = Env::get('SEED_ADMIN_EMAIL', 'admin@sgso.com');
+$clave = Env::get('SEED_ADMIN_PASSWORD', '');
+
+if ($clave === '') {
+    fwrite(STDERR, "Falta SEED_ADMIN_PASSWORD.\n"
+        . "Definila en back/.env o en el entorno antes de correr el seed:\n"
+        . "  SEED_ADMIN_PASSWORD=una-clave-larga php sql/seed.php\n");
+    exit(1);
+}
+
+$hash = password_hash($clave, PASSWORD_BCRYPT);
 
 $stmt = $db->prepare(
     'INSERT INTO usuario (nombre, email, contrasena, rol, activo)
@@ -25,7 +36,7 @@ $stmt = $db->prepare(
      ON DUPLICATE KEY UPDATE contrasena = VALUES(contrasena), activo = 1'
 );
 $stmt->execute(['Admin Sistema', $email, $hash, 'AdministradorSistema']);
-echo "Admin listo: {$email} / admin123\n";
+echo "Admin listo: {$email} (contrasena tomada de SEED_ADMIN_PASSWORD)\n";
 
 // --- Proyectos de ejemplo (solo si la tabla esta vacia) ---
 $total = (int) $db->query('SELECT COUNT(*) FROM proyecto')->fetchColumn();

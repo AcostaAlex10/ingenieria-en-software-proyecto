@@ -132,6 +132,15 @@ export interface PeriodoInactividad {
   fecha_inicio: string;
   fecha_fin: string | null;
   motivo: string;
+  /** Ya empezó y todavía no terminó: es el que mantiene pausada la obra. */
+  vigente?: boolean;
+}
+/**
+ * Alta y cierre de un período devuelven además el estado en que quedó la obra,
+ * o null si no cambió. Evita tener que volver a pedir el proyecto entero.
+ */
+export interface RespuestaInactividad extends PeriodoInactividad {
+  estado_proyecto?: string | null;
 }
 export interface ItemExcedente {
   id_item: number;
@@ -327,11 +336,15 @@ export async function listarInactividades(idProyecto: string): Promise<PeriodoIn
 export async function crearInactividad(
   idProyecto: string,
   datos: { fecha_inicio: string; fecha_fin?: string; motivo: string }
-): Promise<PeriodoInactividad> {
+): Promise<RespuestaInactividad> {
   return parse(await apiFetch(`/proyectos/${idProyecto}/inactividades`, { method: "POST", body: JSON.stringify(datos) }));
 }
-export async function eliminarInactividad(id: number): Promise<void> {
-  await parse(await apiFetch(`/proyectos/inactividad/${id}`, { method: "DELETE" }));
+/** Cierra el período y, si era el último vigente, reactiva la obra. */
+export async function cerrarInactividad(id: number, fecha_fin?: string): Promise<RespuestaInactividad> {
+  return parse(await apiFetch(`/proyectos/inactividad/${id}`, { method: "PUT", body: JSON.stringify({ fecha_fin }) }));
+}
+export async function eliminarInactividad(id: number): Promise<{ mensaje?: string; estado_proyecto?: string | null }> {
+  return parse(await apiFetch(`/proyectos/inactividad/${id}`, { method: "DELETE" }));
 }
 
 // ---------- Ítems excedentes (RF22) ----------

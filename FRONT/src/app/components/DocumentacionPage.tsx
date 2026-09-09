@@ -39,7 +39,7 @@ export default function DocumentacionPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><FileText className="w-7 h-7" /> Documentación</h2>
-        <p className="text-muted-foreground mt-2">Documentos por obra (RF16). Se guarda un enlace al archivo (Drive/URL); no se sube el binario.</p>
+        <p className="text-muted-foreground mt-2">Documentos por obra. Se guarda un enlace al archivo (Drive/URL); no se sube el binario.</p>
       </div>
 
       <Card><CardContent className="pt-6">

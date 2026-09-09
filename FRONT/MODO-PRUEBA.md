@@ -74,6 +74,19 @@ partida, ejecutar en la consola del navegador:
 sgsoMockReset()
 ```
 
+### Publicar datos nuevos
+
+`localStorage` es por origen, no por versión del sitio: redesplegar no limpia
+nada. Sin más, quien ya hubiera entrado seguiría viendo su copia vieja de los
+datos, y si además cambió la forma de un registro esa copia queda inconsistente
+con el código nuevo.
+
+Por eso la clave de almacenamiento lleva un sufijo derivado de `datos.json`
+(`sgso_mock_db_<huella>`). Al publicar datos distintos la clave cambia sola, la
+copia guardada deja de encontrarse y cada persona arranca desde los datos
+nuevos; las copias anteriores se borran al cargar. No hay que acordarse de
+versionar nada a mano ni pedirle a nadie que limpie el navegador.
+
 ## Cómo se implementa
 
 - `src/app/mock/datos.json` — datos ficticios.
@@ -115,35 +128,54 @@ Sin ellas, `npm run build` produce exactamente el mismo resultado de siempre.
 > interpreta como referencias a la coincidencia y sustituye en silencio,
 > corrompiendo el JS. El script ya lo hace.
 
-### Vercel (en uso)
+### Sitio portable para GitHub Pages
 
-El repositorio es privado, y GitHub Pages no está disponible para repositorios
-privados con el plan actual. El sitio de prueba se publica como **preview de
-Vercel** de la rama `testing`, que sí funciona con repositorios privados y no
-requiere configuración adicional en el código: en Vercel el sitio vive en la
-raíz del dominio y `vercel.json` ya resuelve el ruteo de la SPA.
+Compilado así, el sitio funciona en **cualquier subdirectorio** sin conocer de
+antemano el nombre del repositorio, y sin necesidad de `404.html`:
 
-Configuración en el proyecto de Vercel:
+```bash
+cd FRONT
+BASE_PATH=./ VITE_MOCK=1 VITE_HASH_ROUTER=1 npm run build
+```
 
-1. **Settings → Environment Variables**: agregar `VITE_MOCK` con valor `1`,
-   marcando únicamente el entorno **Preview**. No marcar Production: eso
-   convertiría el sitio de la demo en datos ficticios.
-2. **Deployments**: buscar el deployment de la rama `testing` y usar
-   **Redeploy**, para que tome la variable.
+| Variable | Para qué |
+|---|---|
+| `BASE_PATH=./` | rutas relativas a los assets, así el sitio no depende de la ruta donde se publique |
+| `VITE_HASH_ROUTER=1` | las rutas viajan en el fragmento, así recargar en `#/proyectos` no da 404 |
+| `VITE_MOCK=1` | resuelve las peticiones contra el simulador |
 
-La URL resultante tiene la forma
-`https://<proyecto>-git-testing-<usuario>.vercel.app`.
+El contenido de `dist/` se puede subir tal cual a la raíz de un repositorio
+público con Pages habilitado (Source: rama `main`, carpeta `/`).
 
-### GitHub Pages (en pausa)
+Verificado sirviendo `dist/` desde un subdirectorio: carga, login, navegación y
+recarga profunda en `#/proyectos` sin errores.
 
-El workflow `.github/workflows/pages-testing.yml` queda preparado pero con el
-disparador automático desactivado, porque el paso de despliegue falla mientras
-el repositorio sea privado. El job de compilación funciona correctamente.
+### GitHub Pages (en uso)
 
-Para reactivarlo hay que hacer público el repositorio y seguir los pasos que el
-propio workflow documenta. Antes de hacerlo público conviene cambiar la
-contraseña del usuario administrador, que está escrita en `back/sql/seed.php` y
-es válida contra el sistema desplegado.
+El workflow `.github/workflows/pages-testing.yml` publica la demo en cada push a
+**`testing`**, que es la rama del sitio estático. Compila con las tres variables
+de arriba y el resultado queda en
+
+`https://acostaalex10.github.io/ingenieria-en-software-proyecto/`
+
+**`main` no dispara este workflow.** Lleva la aplicación real, la que consume la
+API PHP. Pages sirve un único sitio por repositorio, así que si las dos ramas
+publicaran se pisarían entre sí.
+
+Requiere, una sola vez, **Settings → Pages → Source: "GitHub Actions"**. Ya está
+hecho; sin eso el despliegue falla con un 404 aunque la compilación pase.
+
+### Vercel
+
+Despliega la aplicación real, sin `VITE_MOCK` y contra la API PHP de Render. Es
+un circuito aparte del de Pages y no comparte configuración con él.
+
+Si alguna vez hiciera falta publicar la demo también en Vercel —por ejemplo con
+el repositorio en privado, donde Pages no está disponible— alcanza con agregar
+`VITE_MOCK` con valor `1` en **Settings → Environment Variables** marcando
+únicamente el entorno **Preview**, y redesplegar la rama para que tome la
+variable. No marcar Production: eso convertiría el sitio real en datos
+ficticios.
 
 ### Sin publicar nada
 
