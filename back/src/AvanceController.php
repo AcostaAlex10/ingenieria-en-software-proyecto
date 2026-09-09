@@ -172,8 +172,16 @@ final class AvanceController
      * Transicion automatica del estado de la OBRA segun los avances cargados
      * en su planificacion (RF: ciclo de vida del proyecto):
      *   - primer avance (> 0%) estando en 'planificacion' -> 'en_ejecucion'
-     *   - el avance llega a 100% -> 'finalizada'
-     * Una obra 'pausada' o ya 'finalizada' no se reactiva sola (decision manual).
+     *
+     * El avance NO finaliza la obra. Llegar al 100 % es un dato, no una
+     * decision: la obra se cierra cuando el supervisor aprueba el reporte
+     * final, como establece el TP3 y hace ReporteController. Antes esta
+     * funcion la pasaba a 'finalizada' al tocar el 100 %, y como esa regla no
+     * miraba el estado previo, tambien terminaba una obra pausada o cancelada.
+     *
+     * Ninguna otra transicion sale de aca: 'pausada' la maneja
+     * InactividadController, y 'cancelada' el formulario de obra.
+     *
      * Ademas refleja el avance real (mayor porcentaje cargado) en proyecto.avance,
      * que es lo que muestran el dashboard y el listado.
      */
@@ -198,9 +206,7 @@ final class AvanceController
         $avanceReal = (float) $stmt->fetchColumn();
 
         $estado = $proyecto['estado'];
-        if ($avanceReal >= 100) {
-            $estado = 'finalizada';
-        } elseif ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
+        if ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
             $estado = 'en_ejecucion';
         }
 

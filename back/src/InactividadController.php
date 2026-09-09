@@ -162,11 +162,11 @@ final class InactividadController
         if ($vigentes > 0 && in_array($estado, self::EN_MARCHA, true)) {
             $nuevo = 'pausada';
         } elseif ($vigentes === 0 && $estado === 'pausada') {
-            // Vuelve siempre a `en_ejecucion`. Si la obra se hubiera pausado
-            // desde `en_revision` ese matiz se pierde, pero hoy nadie asigna
-            // ese estado y recordar el anterior pide una columna que todavia
-            // no se justifica. A revisar al implementar EnRevision.
-            $nuevo = 'en_ejecucion';
+            // A donde vuelve depende de si la obra estaba cerrandose. No hace
+            // falta recordar el estado anterior en una columna: si hay un
+            // reporte final esperando revision, la obra estaba en
+            // `en_revision` y ahi vuelve; si no, a `en_ejecucion`.
+            $nuevo = $this->tieneFinalEnRevision($idProyecto) ? 'en_revision' : 'en_ejecucion';
         } else {
             return null;
         }
@@ -174,6 +174,17 @@ final class InactividadController
         $stmt = $this->db->prepare('UPDATE proyecto SET estado = ? WHERE id_proyecto = ?');
         $stmt->execute([$nuevo, $idProyecto]);
         return $nuevo;
+    }
+
+    /** Si la obra tiene un reporte final esperando la revision del supervisor. */
+    private function tieneFinalEnRevision(string $idProyecto): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM reporte
+              WHERE id_proyecto = ? AND es_final = 1 AND estado = 'en_revision'"
+        );
+        $stmt->execute([$idProyecto]);
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     /** @param array<string,mixed> $f @return array<string,mixed> */

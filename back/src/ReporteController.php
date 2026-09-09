@@ -12,16 +12,32 @@ declare(strict_types=1);
  *
  * El autor (personal de obra) crea, edita y envia; el supervisor
  * (PersonalAdministrativo) aprueba o rechaza dejando una observacion.
+ *
+ * REPORTE FINAL Y CIERRE DE LA OBRA
+ *
+ * Un reporte marcado con `es_final` es la certificacion de cierre: enviarlo
+ * lleva la obra a 'en_revision' y aprobarlo la finaliza. Es la unica via por
+ * la que una obra queda terminada. El avance fisico ya no la finaliza solo
+ * por llegar al 100 %: una obra no esta terminada porque un numero llegue a
+ * cien, sino porque alguien la recibe.
+ *
+ * La obra solo se mueve si esta en el estado que corresponde: enviar exige
+ * 'en_ejecucion', y aprobar o rechazar solo mueven una obra que este en
+ * 'en_revision'. Asi la resolucion de un reporte no revive una obra pausada ni
+ * pisa una cancelada.
  */
 final class ReporteController
 {
+    /** Estados de reporte en los que un final ya ocupa el cierre de la obra. */
+    private const FINAL_VIGENTE = ['en_revision', 'aprobado'];
+
     public function __construct(private PDO $db)
     {
     }
 
     private const SELECT =
         'SELECT r.id_reporte, r.id_proyecto, p.nombre AS proyecto, r.id_usuario,
-                u.nombre AS autor, r.titulo, r.contenido, r.estado,
+                u.nombre AS autor, r.titulo, r.contenido, r.estado, r.es_final,
                 r.observacion_revision, r.fecha_creacion, r.fecha_revision
          FROM reporte r
          JOIN proyecto p ON p.id_proyecto = r.id_proyecto
@@ -60,8 +76,16 @@ final class ReporteController
         $stmt->execute([$idProyecto]);
         if ($stmt->fetch() === false) { $this->json(404, ['error' => 'Obra no encontrada']); return; }
 
-        $stmt = $this->db->prepare('INSERT INTO reporte (id_proyecto, id_usuario, titulo, contenido) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$idProyecto, (int) ($usuario['id_usuario'] ?? 0), $titulo, $contenido]);
+        $stmt = $this->db->prepare(
+            'INSERT INTO reporte (id_proyecto, id_usuario, titulo, contenido, es_final) VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([
+            $idProyecto,
+            (int) ($usuario['id_usuario'] ?? 0),
+            $titulo,
+            $contenido,
+            self::leerEsFinal($datos, false) ? 1 : 0,
+        ]);
 
         $this->mostrarPorId((int) $this->db->lastInsertId(), 201);
     }
@@ -83,12 +107,20 @@ final class ReporteController
             return;
         }
 
-        $stmt = $this->db->prepare('UPDATE reporte SET titulo = ?, contenido = ? WHERE id_reporte = ?');
-        $stmt->execute([$titulo, $contenido, $id]);
+        $esFinal = self::leerEsFinal($datos, (bool) $actual['es_final']);
+
+        $stmt = $this->db->prepare('UPDATE reporte SET titulo = ?, contenido = ?, es_final = ? WHERE id_reporte = ?');
+        $stmt->execute([$titulo, $contenido, $esFinal ? 1 : 0, $id]);
         $this->mostrarPorId((int) $id, 200);
     }
 
-    /** POST /api/reportes/{id}/enviar  -> manda a revision. */
+    /**
+     * POST /api/reportes/{id}/enviar  -> manda a revision.
+     *
+     * Si el reporte es el final, ademas lleva la obra a 'en_revision'. Se
+     * exige que la obra este 'en_ejecucion': una obra pausada o ya terminada
+     * no puede entrar en revision de cierre.
+     */
     public function enviar(string $id): void
     {
         $actual = $this->buscar($id);
@@ -97,9 +129,30 @@ final class ReporteController
             $this->json(409, ['error' => 'El reporte ya fue enviado a revisión']);
             return;
         }
+
+        $idProyecto = (string) $actual['id_proyecto'];
+        $esFinal = (bool) $actual['es_final'];
+
+        if ($esFinal) {
+            if ($this->hayOtroFinalVigente($idProyecto, $id)) {
+                $this->json(409, ['error' => 'La obra ya tiene un reporte final en revisión o aprobado']);
+                return;
+            }
+            $estadoObra = $this->estadoObra($idProyecto);
+            if ($estadoObra !== 'en_ejecucion') {
+                $this->json(409, [
+                    'error' => 'Solo se puede enviar el reporte final de una obra en ejecución',
+                ]);
+                return;
+            }
+        }
+
         $this->db->prepare('UPDATE reporte SET estado = ?, observacion_revision = NULL WHERE id_reporte = ?')
             ->execute(['en_revision', $id]);
-        $this->mostrarPorId((int) $id, 200);
+
+        $estadoProyecto = $esFinal ? $this->moverObra($idProyecto, 'en_revision') : null;
+
+        $this->mostrarPorId((int) $id, 200, $estadoProyecto);
     }
 
     /** POST /api/reportes/{id}/aprobar  -> solo desde en_revision. */
@@ -128,7 +181,15 @@ final class ReporteController
         $this->json(200, ['mensaje' => 'Reporte eliminado']);
     }
 
-    /** Aplica una resolucion (aprobado/rechazado) validando que este en revision. */
+    /**
+     * Aplica una resolucion (aprobado/rechazado) validando que este en revision.
+     *
+     * Si el reporte es el final, la resolucion cierra o reabre la obra:
+     * aprobarlo la finaliza, rechazarlo la devuelve a 'en_ejecucion'. Solo se
+     * mueve una obra que este en 'en_revision': si mientras tanto la pausaron
+     * o la cancelaron, la resolucion queda registrada en el reporte y la obra
+     * se deja donde esta, en vez de revivirla.
+     */
     private function resolver(string $id, string $nuevoEstado, ?string $observacion): void
     {
         $actual = $this->buscar($id);
@@ -139,7 +200,58 @@ final class ReporteController
         }
         $stmt = $this->db->prepare('UPDATE reporte SET estado = ?, observacion_revision = ?, fecha_revision = NOW() WHERE id_reporte = ?');
         $stmt->execute([$nuevoEstado, $observacion, $id]);
-        $this->mostrarPorId((int) $id, 200);
+
+        $estadoProyecto = null;
+        if ((bool) $actual['es_final']) {
+            $idProyecto = (string) $actual['id_proyecto'];
+            if ($this->estadoObra($idProyecto) === 'en_revision') {
+                $estadoProyecto = $this->moverObra(
+                    $idProyecto,
+                    $nuevoEstado === 'aprobado' ? 'finalizada' : 'en_ejecucion'
+                );
+            }
+        }
+
+        $this->mostrarPorId((int) $id, 200, $estadoProyecto);
+    }
+
+    /** Estado actual de la obra, o null si no existe. */
+    private function estadoObra(string $idProyecto): ?string
+    {
+        $stmt = $this->db->prepare('SELECT estado FROM proyecto WHERE id_proyecto = ?');
+        $stmt->execute([$idProyecto]);
+        $estado = $stmt->fetchColumn();
+        return $estado === false ? null : (string) $estado;
+    }
+
+    /** Mueve la obra y devuelve el estado nuevo, para que el front lo refleje. */
+    private function moverObra(string $idProyecto, string $estado): string
+    {
+        $this->db->prepare('UPDATE proyecto SET estado = ? WHERE id_proyecto = ?')
+            ->execute([$estado, $idProyecto]);
+        return $estado;
+    }
+
+    /** Si la obra ya tiene otro reporte final ocupando el cierre. */
+    private function hayOtroFinalVigente(string $idProyecto, string $idExcluido): bool
+    {
+        $marcadores = implode(',', array_fill(0, count(self::FINAL_VIGENTE), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM reporte
+              WHERE id_proyecto = ? AND es_final = 1 AND id_reporte <> ?
+                AND estado IN ({$marcadores})"
+        );
+        $stmt->execute(array_merge([$idProyecto, $idExcluido], self::FINAL_VIGENTE));
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /** Lee `es_final` del cuerpo aceptando booleano, 0/1 o "true"/"false". */
+    private static function leerEsFinal(array $datos, bool $porDefecto): bool
+    {
+        if (!array_key_exists('es_final', $datos)) {
+            return $porDefecto;
+        }
+        return filter_var($datos['es_final'], FILTER_VALIDATE_BOOL);
     }
 
     /** @return array<string,mixed>|null */
@@ -151,13 +263,24 @@ final class ReporteController
         return $fila === false ? null : $fila;
     }
 
-    private function mostrarPorId(int $id, int $codigo): void
+    /**
+     * @param string|null $estadoProyecto estado nuevo de la obra, si la
+     *        operacion la movio. Viaja en la respuesta para que el front lo
+     *        refleje sin volver a pedir la obra.
+     */
+    private function mostrarPorId(int $id, int $codigo, ?string $estadoProyecto = null): void
     {
         $stmt = $this->db->prepare(self::SELECT . ' WHERE r.id_reporte = ?');
         $stmt->execute([$id]);
         $fila = $stmt->fetch();
         if ($fila === false) { $this->json(404, ['error' => 'Reporte no encontrado']); return; }
-        $this->json($codigo, self::normalizar($fila));
+
+        $cuerpo = self::normalizar($fila);
+        if ($estadoProyecto !== null) {
+            $cuerpo['estado_proyecto'] = $estadoProyecto;
+        }
+
+        $this->json($codigo, $cuerpo);
     }
 
     /** @param array<string,mixed> $f @return array<string,mixed> */
@@ -166,6 +289,7 @@ final class ReporteController
         $f['id_reporte'] = (int) $f['id_reporte'];
         $f['id_proyecto'] = (int) $f['id_proyecto'];
         $f['id_usuario'] = (int) $f['id_usuario'];
+        $f['es_final'] = (bool) $f['es_final'];
         return $f;
     }
 

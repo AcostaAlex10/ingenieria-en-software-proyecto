@@ -186,13 +186,17 @@ Sirven para saber qué resultado es el correcto.
 Casi todos cambian solos; el único que se elige a mano es la cancelación.
 
 - `planificación` → `en ejecución` con el primer avance mayor a cero.
-- `en ejecución` → `finalizada` al llegar al 100 %.
+- `en ejecución` → `en revisión` al enviarse el reporte marcado como final.
+- `en revisión` → `finalizada` cuando el supervisor aprueba ese reporte, o de
+  vuelta a `en ejecución` si lo rechaza.
 - `en ejecución` → `pausada` al registrar un período de inactividad vigente, y
   vuelve a `en ejecución` cuando ese período se cierra o se elimina.
 - `en ejecución` o `pausada` → `cancelada`, desde el campo Estado del formulario
   de edición de la obra. Es la única transición manual, y solo la pueden hacer
   el Administrador y el Administrativo.
-- El avance de la obra es el mayor porcentaje registrado.
+- El avance de la obra es el mayor porcentaje registrado. **Llegar al 100 % no
+  la finaliza**: solo la cierra la aprobación del reporte final. Al 100 % sin
+  reporte final, el detalle avisa que hay que cargarlo.
 
 Sobre la cancelación vale la pena probar los bordes: el campo Estado no ofrece
 ningún otro valor, aparece deshabilitado en una obra que no está en marcha, y el
@@ -276,8 +280,8 @@ No son defectos. Reportarlas hace ruido.
 - **La pantalla de Maquinaria tarda unos segundos** en mostrar el contenido.
 - **La documentación se guarda como enlace**, no se suben archivos. Es una decisión
   de diseño: el servidor no conserva archivos entre reinicios.
-- **Falta un estado de obra** respecto de lo diagramado: no existe "en revisión".
-  Está documentado en `REVISION-TPS.md`.
+- **Falta un estado de obra** respecto de lo diagramado: no existe "creada", que
+  el TP3 distingue de "planificación". Está documentado en `REVISION-TPS.md`.
 - **El sistema no tiene pruebas automatizadas.**
 
 ---

@@ -106,9 +106,9 @@ reporte que no va a enviar) y desde `Rechazado`.
 Estas no las marcó el docente. Surgen de comparar los diagramas del TP3 con el
 código, y conviene resolverlas antes de que las encuentre la cátedra.
 
-### 2.1. Estados del proyecto: faltan tres de los siete
+### 2.1. Estados del proyecto: falta uno de los siete
 
-El TP3 define siete estados. El sistema usa cuatro, y con otros nombres.
+El TP3 define siete estados. El sistema asigna seis, con otros nombres.
 
 | Estado en el TP3 | En el sistema | Situación |
 |---|---|---|
@@ -116,8 +116,8 @@ El TP3 define siete estados. El sistema usa cuatro, y con otros nombres.
 | Planificado | `planificacion` | Existe, pero fusiona Creado y Planificado |
 | EnEjecucion | `en_ejecucion` | Correcto |
 | Pausado | `pausada` | Correcto: lo asigna `InactividadController` |
-| EnRevision | — | **No existe** |
-| Finalizado | `finalizada` | Existe, pero se alcanza por otro camino |
+| EnRevision | `en_revision` | Correcto: lo asigna `ReporteController` con el reporte final |
+| Finalizado | `finalizada` | Correcto: al aprobarse el reporte final |
 | Cancelado | `cancelada` | Correcto: se asigna desde el formulario de obra |
 
 Detalle de lo verificado en el código:
@@ -126,16 +126,17 @@ Detalle de lo verificado en el código:
   estados y valor por defecto `'planificacion'`. En la base ya desplegada sigue
   siendo `VARCHAR(30)` hasta que se corra `back/sql/migracion-estado-enum.php`:
   `migrar.php` no aplica cambios de tipo sobre tablas que ya existen.
-- `AvanceController::sincronizarProyecto()` es lo único que cambia el estado:
-  pasa de `planificacion` a `en_ejecucion` con el primer avance mayor a cero, y a
-  `finalizada` al llegar al 100 %.
+- `AvanceController::sincronizarProyecto()` pasa de `planificacion` a
+  `en_ejecucion` con el primer avance mayor a cero, y nada más. Ya no finaliza
+  la obra al llegar al 100 %: esa regla no miraba el estado previo, así que
+  también terminaba una obra pausada o cancelada.
 - `InactividadController` **sí mueve el estado**: registrar un período vigente
   pasa la obra a `pausada`, y cerrarlo o eliminarlo la devuelve a
   `en_ejecucion`. Para cerrar un período sin borrarlo se agregó
   `PUT /api/proyectos/inactividad/{id}`.
-- `ReporteController` no modifica el proyecto. Aprobar el reporte final no lleva
-  la obra a `Finalizado`, como establece el diagrama; el sistema la finaliza por
-  porcentaje de avance.
+- `ReporteController` sí mueve el proyecto: enviar a revisión el reporte marcado
+  con `es_final` lleva la obra a `en_revision`, aprobarlo la finaliza y
+  rechazarlo la devuelve a `en_ejecucion`, como establece el diagrama.
 - El formulario de edición de obras incluye el campo estado, con `cancelada` como
   única opción manual y solo desde una obra en ejecución o pausada. Pausar no se
   hace desde ahí: lo dispara el registro de un período de inactividad.
@@ -190,10 +191,10 @@ documentadas que no se construyeron. En orden de esfuerzo:
 3. ~~**Permitir cancelar una obra** desde la interfaz, con el rol
    correspondiente.~~ Hecho: el formulario de edición ofrece `cancelada` a los
    roles de gestión de obra, desde `en_ejecucion` o `pausada`.
-4. **Incorporar `EnRevision` para el proyecto**, conectado al circuito de
-   aprobación de reportes: al aprobarse el reporte final, la obra pasa a
-   `Finalizado`. Es el cambio más invasivo, porque toca la relación entre el
-   módulo de reportes y el de obras.
+4. ~~**Incorporar `EnRevision` para el proyecto**, conectado al circuito de
+   aprobación de reportes.~~ Hecho: `reporte.es_final` marca el reporte de
+   cierre; enviarlo lleva la obra a `en_revision` y aprobarlo la finaliza. El
+   avance físico dejó de finalizarla.
 5. Distinguir `Creado` de `Planificado`, de modo que una obra sin planificación
    cargada no figure ya como planificada.
 

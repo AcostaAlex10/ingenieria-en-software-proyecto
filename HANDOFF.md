@@ -12,22 +12,29 @@ ya nos topamos.
 
 **Repositorio:** `AcostaAlex10/ingenieria-en-software-proyecto` — público.
 
-> ### ⚠ Lo primero: hay una migración sin correr
+> ### ⚠ Lo primero: hay dos migraciones sin correr
 >
-> `proyecto.estado` pasó a `ENUM` en `schema.sql`, pero **eso no altera la base
-> ya creada**. Hay que correr una vez, contra Aiven:
+> Los cambios de esquema no alteran una base que ya existe: `migrar.php` solo
+> ejecuta `schema.sql`, y todas sus tablas usan `CREATE TABLE IF NOT EXISTS`.
+> Hay que correr los dos scripts una vez, contra Aiven:
 >
 > ```powershell
 > $env:DB_HOST="…"; $env:DB_PORT="…"; $env:DB_NAME="…"
 > $env:DB_USER="…"; $env:DB_PASSWORD="…"; $env:DB_SSL="true"
 > php back/sql/migracion-estado-enum.php
+> php back/sql/migracion-reporte-final.php
 > ```
 >
 > Los cinco valores están en Render → el servicio del backend → Environment.
-> El script es idempotente y aborta sin tocar nada si encuentra estados fuera de
-> la lista. **No hay urgencia**: hasta que se corra, `estado` sigue siendo
-> `VARCHAR` y acepta `pausada` igual, así que el sistema funciona; lo que falta
-> es la restricción que impide guardar un estado inválido.
+> Los dos scripts son idempotentes y no tocan ningún dato existente.
+>
+> | Script | Qué hace | Si no se corre |
+> |---|---|---|
+> | `migracion-estado-enum.php` | `proyecto.estado` de `VARCHAR` a `ENUM` | Sin urgencia: el sistema funciona, falta la restricción que impide guardar un estado inválido |
+> | `migracion-reporte-final.php` | agrega `reporte.es_final` | **Bloqueante en producción**: sin esa columna, todo el módulo de reportes falla. El cierre de obra depende de ella |
+>
+> El segundo es el que importa: hasta que se corra, la API desplegada va a
+> romper al listar o crear reportes. La demo estática no se ve afectada.
 
 **Rama de trabajo: `main`.** Ahí va todo el desarrollo, y ahí despliegan Vercel
 y Render.
@@ -98,7 +105,7 @@ back/             API REST en PHP 8 sin framework — este es el backend
   public/index.php      front controller: rutas, token y roles
   src/                  un controlador por recurso
   sql/                  schema.sql (17 tablas), migrar.php, seed.php
-                        migracion-estado-enum.php (cambios de tipo)
+                        migracion-*.php (cambios de esquema, uno por cambio)
 back-node/        API equivalente en Node — NO se despliega, no tocar
 ```
 
@@ -149,6 +156,12 @@ Y en la sesión siguiente:
   piso de hoy también al editar, así que el navegador daba por inválido el
   formulario de cualquier obra ya empezada: no se podía guardar ningún cambio.
   Ahora el piso aplica solo al alta, como en `ProyectoController::registrar()`.
+- **`EnRevision` y cierre por reporte final.** Un reporte marcado con `es_final`
+  cierra la obra: enviarlo la lleva a `en_revision` y aprobarlo la finaliza;
+  rechazarlo la devuelve a `en_ejecucion`. **El avance ya no finaliza la obra**:
+  llegar al 100 % es un dato, no una decisión. Se agregó `reporte.es_final` con
+  su migración. Al reactivar una obra pausada, vuelve a `en_revision` si hay un
+  reporte final esperando, sin necesidad de recordar el estado anterior.
 
 El TP4 está cerrado. La demo estática está publicada y verificada.
 
@@ -167,18 +180,13 @@ Aiven, como explica el aviso de la sección 1.
    y documentar la desviación con su fundamento en `DOCUMENTACION.md` —hoy solo
    figura en la guía de testers, que la cátedra no lee—. Es una decisión de
    grupo, no una tarea.
-2. **Incorporar `EnRevision` para el proyecto**, ligado a la aprobación del
-   reporte final. El más invasivo, y arrastra una decisión: el TP3 dice que la
-   obra se finaliza cuando el supervisor aprueba, y `AvanceController` la
-   finaliza sola al 100 %. Las dos reglas no conviven; hay que elegir antes de
-   escribir código.
-3. **Completar RF26**: `incidencia.gravedad` clasifica, pero no dispara los
+2. **Completar RF26**: `incidencia.gravedad` clasifica, pero no dispara los
    protocolos de notificación que pide el requerimiento. `Mailer` ya funciona.
-4. **Llevar la alerta de maquinaria a la pantalla de Alertas.** RF24 está
+3. **Llevar la alerta de maquinaria a la pantalla de Alertas.** RF24 está
    cumplido —`MaquinariaController` compara contra el promedio de cada máquina—
    pero esa alerta no llega a `AnalisisController`, que solo emite las de avance
    y material.
-5. **Distinguir `Creado` de `Planificado`.**
+4. **Distinguir `Creado` de `Planificado`.**
 
 **De la documentación**: quedan **C1, C2 y C3**, que son ediciones sobre el PDF
 del TP2 (los actores del diagrama, y el nombre y las condiciones del CU22) y no

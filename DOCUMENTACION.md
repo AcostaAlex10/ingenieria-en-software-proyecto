@@ -174,7 +174,7 @@ Creado → Planificado → EnEjecucion ⇄ Pausado
 | `EnEjecucion → Pausado` | se registra un período de inactividad |
 | `EnRevision → Pausado` | ídem, con la obra en revisión — **corrección C4** |
 | `Pausado → EnEjecucion` | se cierra el período de inactividad |
-| `EnEjecucion → EnRevision` | el Personal Técnico completa el reporte final |
+| `EnEjecucion → EnRevision` | se envía a revisión el reporte marcado como final |
 | `EnRevision → EnEjecucion` | el supervisor rechaza el reporte |
 | `EnRevision → Finalizado` | el supervisor aprueba reporte y certificación |
 | `EnEjecucion → Cancelado`, `Pausado → Cancelado` | decisión gerencial |
@@ -188,13 +188,22 @@ snake_case de la base. Tres todavía no los asigna nadie:
 | Planificado | `planificacion` | valor inicial de toda obra nueva |
 | EnEjecucion | `en_ejecucion` | `AvanceController` con el primer avance mayor a cero, e `InactividadController` al cerrarse el último período |
 | Pausado | `pausada` | `InactividadController` con un período vigente |
-| EnRevision | `en_revision` | nadie |
-| Finalizado | `finalizada` | `AvanceController` al llegar al 100 % |
+| EnRevision | `en_revision` | `ReporteController` al enviarse el reporte final |
+| Finalizado | `finalizada` | `ReporteController` al aprobarse el reporte final |
 | Cancelado | `cancelada` | el formulario de obra, con rol de gestión |
 
-Quedan dos huecos —`creada` y `en_revision`—, la brecha que detalla
-`REVISION-TPS.md`. El `ENUM` existe para que la base no acepte un estado
-inventado mientras se cierran.
+Queda un hueco, `creada`, la brecha que detalla `REVISION-TPS.md`. El `ENUM`
+existe para que la base no acepte un estado inventado mientras se cierra.
+
+**El avance físico no finaliza la obra.** Llegar al 100 % es un dato, no una
+decisión: la obra se cierra cuando el supervisor aprueba el reporte final, como
+establece el TP3. `AvanceController::sincronizarProyecto()` solo mantiene
+`proyecto.avance` al día y mueve la obra de `planificacion` a `en_ejecucion` con
+el primer avance mayor a cero. Antes finalizaba al tocar el 100 %, y como esa
+regla no miraba el estado previo también terminaba una obra pausada o cancelada.
+
+Cuando una obra llega al 100 % sin reporte final, el detalle avisa que hay que
+cargarlo. Guía, no decide.
 
 **Cancelar es el único cambio de estado manual.** El resto los mueve el sistema,
 y por eso el formulario de obra ofrece `cancelada` y nada más: aceptar cualquier
@@ -226,6 +235,22 @@ el código lo tienen todavía.
 
 `reporte.estado` es `ENUM('borrador','en_revision','aprobado','rechazado')`,
 con valor inicial `borrador`.
+
+#### El reporte final cierra la obra
+
+`reporte.es_final` distingue el reporte de cierre de un parte diario común. Es
+la certificación del TP3, y la única vía por la que una obra queda terminada:
+
+- Enviarlo lleva la obra a `en_revision`. Se exige que esté `en_ejecucion` y que
+  no haya ya otro reporte final en revisión o aprobado para esa obra.
+- Aprobarlo la finaliza; rechazarlo la devuelve a `en_ejecucion`.
+- Aprobar o rechazar solo mueven una obra que esté en `en_revision`. Si mientras
+  tanto la pausaron o la cancelaron, la resolución queda registrada en el
+  reporte y la obra se deja donde está, en vez de revivirla.
+- Un reporte sin marcar no toca el estado de la obra.
+
+Las respuestas de esas tres acciones traen `estado_proyecto` cuando la obra se
+movió, para que la interfaz lo refleje sin volver a pedirla.
 
 #### Los demás
 
