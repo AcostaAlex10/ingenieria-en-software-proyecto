@@ -254,7 +254,8 @@ No son defectos. Reportarlas hace ruido.
 - **La documentación se guarda como enlace**, no se suben archivos. Es una decisión
   de diseño: el servidor no conserva archivos entre reinicios.
 - **Faltan estados de obra** respecto de lo diagramado: no existen "cancelada" ni
-  "en revisión", y registrar un período de inactividad no pausa la obra. Está
+  "en revisión". Registrar un período de inactividad **sí** pausa la obra, y
+  cerrarlo la reactiva. Está
   documentado en `REVISION-TPS.md`.
 - **El sistema no tiene pruebas automatizadas.**
 

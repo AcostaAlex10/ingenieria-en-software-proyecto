@@ -180,20 +180,27 @@ Creado → Planificado → EnEjecucion ⇄ Pausado
 | `EnEjecucion → Cancelado`, `Pausado → Cancelado` | decisión gerencial |
 
 `proyecto.estado` es un `ENUM` con los siete valores, en la convención
-snake_case de la base. Cuatro todavía no los asigna nadie:
+snake_case de la base. Tres todavía no los asigna nadie:
 
 | TP3 | En la base | Quién lo asigna hoy |
 |---|---|---|
 | Creado | `creada` | nadie |
 | Planificado | `planificacion` | valor inicial de toda obra nueva |
-| EnEjecucion | `en_ejecucion` | `AvanceController` con el primer avance mayor a cero |
-| Pausado | `pausada` | nadie |
+| EnEjecucion | `en_ejecucion` | `AvanceController` con el primer avance mayor a cero, e `InactividadController` al cerrarse el último período |
+| Pausado | `pausada` | `InactividadController` con un período vigente |
 | EnRevision | `en_revision` | nadie |
 | Finalizado | `finalizada` | `AvanceController` al llegar al 100 % |
 | Cancelado | `cancelada` | nadie |
 
-Esos cuatro huecos son la brecha que detalla `REVISION-TPS.md`. El `ENUM`
+Esos tres huecos son la brecha que detalla `REVISION-TPS.md`. El `ENUM`
 existe para que la base no acepte un estado inventado mientras se cierran.
+
+Un período de inactividad está **vigente** si ya empezó y todavía no terminó.
+`fecha_fin` es el día en que la obra vuelve a arrancar, no el último día parado:
+por eso cerrar un período con la fecha de hoy la reactiva hoy. Con al menos un
+período vigente la obra queda `pausada`; cuando no queda ninguno, vuelve a
+`en_ejecucion`. Solo se pausa una obra en marcha: registrar un período histórico
+sobre una obra finalizada la deja como está.
 
 #### Reporte
 

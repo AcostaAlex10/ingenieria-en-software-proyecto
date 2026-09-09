@@ -112,7 +112,8 @@ El TP4 está cerrado. La demo estática está publicada y verificada.
 1. Convertir `proyecto.estado` en `ENUM`. Hoy es un `VARCHAR(30)` sin
    restricción, así que admite cualquier valor.
 2. Pausar la obra al registrar un período de inactividad. El TP3 define esa
-   transición y `InactividadController` no toca el estado.
+   transición y `InactividadController` ya la implementa: registrar un período
+   vigente pausa la obra y cerrarlo la reactiva.
 3. Permitir cancelar una obra. Es el único estado terminal del TP3 que el sistema
    no ofrece, y el formulario no incluye el campo estado.
 4. Incorporar `EnRevision` para el proyecto, ligado a la aprobación del reporte

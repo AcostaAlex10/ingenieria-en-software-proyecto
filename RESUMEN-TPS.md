@@ -228,10 +228,11 @@ alertas de avance (RF11) y de material (RF12).
 ## Estado del ciclo de vida de la obra
 
 Aparte de los RF, el TP3 define un ciclo de vida que el sistema cubre a medias.
-`proyecto.estado` ya es un `ENUM` con los siete valores, pero solo tres los
-asigna alguien: `planificacion` al crear la obra, y `en_ejecucion` y `finalizada`
-desde `AvanceController` según el porcentaje de avance. Nadie asigna `creada`,
-`pausada`, `en_revision` ni `cancelada`.
+`proyecto.estado` ya es un `ENUM` con los siete valores, y cuatro los asigna
+alguien: `planificacion` al crear la obra, `en_ejecucion` y `finalizada` desde
+`AvanceController` según el porcentaje de avance, y `pausada` desde
+`InactividadController` cuando hay un período de inactividad vigente. Nadie
+asigna todavía `creada`, `en_revision` ni `cancelada`.
 
 Hay además un conflicto de reglas sin resolver: el TP3 establece que la obra se
 finaliza cuando el supervisor aprueba el reporte final, y el código la finaliza

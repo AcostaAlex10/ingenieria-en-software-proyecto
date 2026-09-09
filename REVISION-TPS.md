@@ -128,8 +128,10 @@ Detalle de lo verificado en el código:
 - `AvanceController::sincronizarProyecto()` es lo único que cambia el estado:
   pasa de `planificacion` a `en_ejecucion` con el primer avance mayor a cero, y a
   `finalizada` al llegar al 100 %.
-- `InactividadController` **no toca el estado**. Registrar un período de
-  inactividad no pausa la obra, aunque el TP3 define esa transición.
+- `InactividadController` **sí mueve el estado**: registrar un período vigente
+  pasa la obra a `pausada`, y cerrarlo o eliminarlo la devuelve a
+  `en_ejecucion`. Para cerrar un período sin borrarlo se agregó
+  `PUT /api/proyectos/inactividad/{id}`.
 - `ReporteController` no modifica el proyecto. Aprobar el reporte final no lleva
   la obra a `Finalizado`, como establece el diagrama; el sistema la finaliza por
   porcentaje de avance.

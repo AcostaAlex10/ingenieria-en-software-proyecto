@@ -18,7 +18,7 @@ import {
   listarCatalogoMateriales, listarMaterialesObra, asignarMaterial,
   eliminarAsignacionMaterial, crearConsumo,
   listarDocumentos, crearDocumento, eliminarDocumento,
-  listarInactividades, crearInactividad, eliminarInactividad,
+  listarInactividades, crearInactividad, cerrarInactividad, eliminarInactividad,
   listarExcedentes, crearExcedente, eliminarExcedente,
   type Proyecto, type Planificacion, type Avance, type Resumen,
   type EtapaPlanificacion,
@@ -367,11 +367,19 @@ export default function ProyectoDetallePage() {
   }
 
   // --- Inactividad (RF25) ---
+  // El backend mueve el estado de la obra al registrar o cerrar un período
+  // (TP3) y lo devuelve en la respuesta, así que no hace falta recargarla.
+  function aplicarEstadoObra(estado: string | null | undefined) {
+    if (!estado) return;
+    setProyecto((prev) => (prev ? { ...prev, estado } : prev));
+    toast.info(estado === "pausada" ? "La obra quedó pausada" : "La obra volvió a ejecución");
+  }
+
   async function guardarInactividad(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
     try {
-      await crearInactividad(id, {
+      const creado = await crearInactividad(id, {
         fecha_inicio: formInac.fecha_inicio,
         fecha_fin: formInac.fecha_fin || undefined,
         motivo: formInac.motivo,
@@ -379,14 +387,27 @@ export default function ProyectoDetallePage() {
       toast.success("Período de inactividad registrado");
       setFormInac({ fecha_inicio: hoy(), fecha_fin: "", motivo: "" });
       setInactividades(await listarInactividades(id));
+      aplicarEstadoObra(creado.estado_proyecto);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al registrar el período");
     }
   }
+  async function cerrarPeriodo(idP: number) {
+    if (!id) return;
+    try {
+      const cerrado = await cerrarInactividad(idP);
+      toast.success("Período cerrado");
+      setInactividades(await listarInactividades(id));
+      aplicarEstadoObra(cerrado.estado_proyecto);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al cerrar el período");
+    }
+  }
   async function borrarInactividad(idP: number) {
     try {
-      await eliminarInactividad(idP);
+      const r = await eliminarInactividad(idP);
       setInactividades((prev) => prev.filter((p) => p.id_periodo !== idP));
+      aplicarEstadoObra(r.estado_proyecto);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
@@ -1013,6 +1034,10 @@ export default function ProyectoDetallePage() {
                     {fmtFecha(p.fecha_inicio)}{p.fecha_fin ? ` → ${fmtFecha(p.fecha_fin)}` : ""}
                   </span>
                   <span className="flex-1">{p.motivo}</span>
+                  {p.vigente && <Badge variant="destructive">Obra pausada</Badge>}
+                  {cargaDocs && p.vigente && (
+                    <Button size="sm" variant="outline" onClick={() => cerrarPeriodo(p.id_periodo)} title="Cerrar el período y reactivar la obra">Cerrar</Button>
+                  )}
                   {cargaDocs && (
                     <Button size="sm" variant="ghost" onClick={() => borrarInactividad(p.id_periodo)} title="Eliminar"><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>
                   )}

@@ -405,6 +405,40 @@ function proyectoSegunRol(p: Fila, rol: string): Fila {
 // ---------------------------------------------------------------- despacho
 
 /** Borra de una coleccion por id y devuelve la respuesta correspondiente. */
+/** Estados desde los que una obra puede pasar a `pausada` (TP3). */
+const EN_MARCHA = ["en_ejecucion", "en_revision"];
+
+/**
+ * Un periodo esta vigente si ya empezo y todavia no termino. La fecha de fin es
+ * el dia en que la obra vuelve a arrancar, no el ultimo dia parado: por eso se
+ * compara con `>` y cerrar un periodo hoy reactiva la obra hoy.
+ */
+function periodoVigente(p: Fila, dia = hoy()): boolean {
+  const inicio = texto(p.fecha_inicio);
+  const fin = p.fecha_fin == null ? "" : texto(p.fecha_fin);
+  return inicio <= dia && (fin === "" || fin > dia);
+}
+
+/**
+ * Reproduce InactividadController::sincronizarEstado(): con al menos un periodo
+ * vigente la obra queda `pausada`; cuando no queda ninguno, vuelve a
+ * `en_ejecucion`. Devuelve el estado nuevo, o null si no hubo cambio.
+ */
+function sincronizarPorInactividad(idProyecto: number): string | null {
+  const obra = db.proyectos.find((p) => String(p.id) === String(idProyecto));
+  if (!obra) return null;
+  const vigentes = db.inactividades.filter(
+    (p) => Number(p.id_proyecto) === idProyecto && periodoVigente(p)
+  ).length;
+  let nuevo: string;
+  if (vigentes > 0 && EN_MARCHA.includes(texto(obra.estado))) nuevo = "pausada";
+  else if (vigentes === 0 && texto(obra.estado) === "pausada") nuevo = "en_ejecucion";
+  else return null;
+  obra.estado = nuevo;
+  guardar();
+  return nuevo;
+}
+
 function eliminarDe(coleccion: Fila[], campo: string, id: number): Response {
   const i = coleccion.findIndex((f) => Number(f[campo]) === id);
   if (i === -1) return noEncontrado();
@@ -782,9 +816,38 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       incidencia: [db.incidencias, "id_incidencia", ROLES_AVANCE],
       consumo: [db.consumos, "id_consumo", ROLES_AVANCE],
       documento: [db.documentos, "id_documento", ROLES_DOC],
-      inactividad: [db.inactividades, "id_periodo", ROLES_DOC],
       excedente: [db.excedentes, "id_item", ROLES_DOC],
     };
+    // Inactividad por id: cerrar (PUT) o eliminar (DELETE). Los dos reactivan
+    // la obra si era el ultimo periodo vigente, pero cerrar conserva el
+    // registro que RF25 pide y eliminar lo pierde.
+    if (s[1] === "inactividad" && s[2] !== undefined && (metodo === "PUT" || metodo === "DELETE")) {
+      const veto = exige(ROLES_DOC);
+      if (veto) return veto;
+      const idPer = num(s[2]);
+      const i = db.inactividades.findIndex((p) => Number(p.id_periodo) === idPer);
+      if (i === -1) return noEncontrado();
+      const periodo = db.inactividades[i];
+      const idProy = Number(periodo.id_proyecto);
+
+      if (metodo === "DELETE") {
+        db.inactividades.splice(i, 1);
+        guardar();
+        return ok({ mensaje: "Período eliminado", estado_proyecto: sincronizarPorInactividad(idProy) });
+      }
+
+      const fin = texto(cuerpo.fecha_fin) || hoy();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fin)) {
+        return json(422, { errors: { fecha_fin: "Formato esperado: YYYY-MM-DD" } });
+      }
+      if (fin < texto(periodo.fecha_inicio)) {
+        return json(422, { errors: { fecha_fin: "La fecha de fin no puede ser anterior al inicio" } });
+      }
+      periodo.fecha_fin = fin;
+      guardar();
+      return ok({ ...periodo, vigente: periodoVigente(periodo), estado_proyecto: sincronizarPorInactividad(idProy) });
+    }
+
     if (metodo === "DELETE" && porId[s[1]]) {
       const [coleccion, campo, roles] = porId[s[1]];
       const veto = exige(roles);
@@ -1002,7 +1065,22 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
     if (simples[sub]) {
       const [coleccion, campoId, roles, construir] = simples[sub];
       if (metodo === "GET") {
-        return ok(coleccion.filter((f) => String(f.id_proyecto) === String(idObra)));
+        const filas = coleccion.filter((f) => String(f.id_proyecto) === String(idObra));
+        if (sub === "inactividades") {
+          // Mismo orden que el ORDER BY de InactividadController, y el flag que
+          // la interfaz usa para saber cual periodo mantiene pausada la obra.
+          return ok(
+            filas
+              .slice()
+              .sort(
+                (a, b) =>
+                  texto(b.fecha_inicio).localeCompare(texto(a.fecha_inicio)) ||
+                  Number(b.id_periodo) - Number(a.id_periodo)
+              )
+              .map((f) => ({ ...f, vigente: periodoVigente(f) }))
+          );
+        }
+        return ok(filas);
       }
       if (metodo === "POST") {
         const veto = exige(roles);
@@ -1010,6 +1088,14 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
         const nuevo = { [campoId]: proximoId(coleccion, campoId), ...construir(cuerpo) };
         coleccion.push(nuevo);
         guardar();
+        if (sub === "inactividades") {
+          // Registrar un periodo vigente pausa la obra (TP3).
+          return creado({
+            ...nuevo,
+            vigente: periodoVigente(nuevo),
+            estado_proyecto: sincronizarPorInactividad(idNum),
+          });
+        }
         return creado(nuevo);
       }
     }
