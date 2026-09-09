@@ -405,6 +405,25 @@ function proyectoSegunRol(p: Fila, rol: string): Fila {
 // ---------------------------------------------------------------- despacho
 
 /** Borra de una coleccion por id y devuelve la respuesta correspondiente. */
+/**
+ * Valida un rango de fechas como lo hace el backend: formato ISO en las dos y
+ * el fin nunca antes del inicio. El simulador tiene que rechazar lo mismo que
+ * PHP, o la demo acepta datos que el sistema real no.
+ */
+function validarRango(
+  inicio: string,
+  fin: string,
+  errores: Record<string, string>,
+  inicioObligatorio = true
+): void {
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (inicioObligatorio && !iso.test(inicio)) errores.fecha_inicio = "Formato esperado: YYYY-MM-DD";
+  if (fin !== "" && !iso.test(fin)) errores.fecha_fin = "Formato esperado: YYYY-MM-DD";
+  if (fin !== "" && !errores.fecha_inicio && !errores.fecha_fin && fin < inicio) {
+    errores.fecha_fin = "La fecha de fin no puede ser anterior al inicio";
+  }
+}
+
 /** Estados desde los que una obra puede pasar a `pausada` (TP3). */
 const EN_MARCHA = ["en_ejecucion", "en_revision"];
 
@@ -764,6 +783,27 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (metodo === "POST") {
         const veto = exige(ROLES_GESTION_OBRA);
         if (veto) return veto;
+        // Mismas validaciones que EtapaPlanificacionController::validar().
+        const errores: Record<string, string> = {};
+        if (!texto(cuerpo.nombre)) errores.nombre = "Obligatorio";
+        const peso = num(cuerpo.peso_porcentual);
+        if (cuerpo.peso_porcentual === undefined || peso < 0 || peso > 100) {
+          errores.peso_porcentual = "Debe ser un número entre 0 y 100";
+        }
+        validarRango(texto(cuerpo.fecha_inicio), texto(cuerpo.fecha_fin), errores);
+        if (num(cuerpo.presupuesto_base) < 0) {
+          errores.presupuesto_base = "Debe ser un número mayor o igual a 0";
+        }
+        const suma = db.etapas
+          .filter((e) => Number(e.id_planificacion) === idPlan)
+          .reduce((t, e) => t + num(e.peso_porcentual), 0);
+        if (!errores.peso_porcentual && suma + peso > 100.01) {
+          errores.peso_porcentual =
+            `La suma de pesos superaría 100%. Suma actual: ${suma.toFixed(2)}%. ` +
+            `Peso disponible: ${Math.max(0, 100 - suma).toFixed(2)}%.`;
+        }
+        if (Object.keys(errores).length) return json(422, { errors: errores });
+
         const nueva: Fila = {
           id_etapa: proximoId(db.etapas, "id_etapa"),
           id_planificacion: idPlan,
@@ -1085,6 +1125,13 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (metodo === "POST") {
         const veto = exige(roles);
         if (veto) return veto;
+        if (sub === "inactividades") {
+          // Mismas validaciones que InactividadController::crear().
+          const errores: Record<string, string> = {};
+          validarRango(texto(cuerpo.fecha_inicio), texto(cuerpo.fecha_fin), errores);
+          if (!texto(cuerpo.motivo)) errores.motivo = "Obligatorio";
+          if (Object.keys(errores).length) return json(422, { errors: errores });
+        }
         const nuevo = { [campoId]: proximoId(coleccion, campoId), ...construir(cuerpo) };
         coleccion.push(nuevo);
         guardar();

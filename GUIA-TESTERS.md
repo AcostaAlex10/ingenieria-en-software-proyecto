@@ -217,6 +217,18 @@ Cambian solos a partir del avance físico, no se eligen a mano:
 - Se marca un consumo anómalo cuando los litros por hora de ese registro superan
   en más del 50 % el promedio de esa máquina.
 
+**Pausa de obra**
+
+- Registrar un período de inactividad **sin fecha de fin** pausa la obra: el
+  detalle muestra un aviso rojo arriba de todo y la obra figura como "Pausada"
+  en el listado y en el panel de control.
+- El botón **Continuar obra** cierra el período y la obra vuelve a "En ejecución".
+  Eliminar el período hace lo mismo, pero pierde el registro de la parada.
+- Un período con fecha de fin ya pasada no pausa nada: es historia.
+- Una obra finalizada no se reactiva por registrarle un período.
+- La fecha de fin es el día en que la obra **vuelve a arrancar**, no el último día
+  parado: por eso no puede ser anterior a la de inicio, y cerrar hoy reactiva hoy.
+
 **Certificación**
 
 - El importe certificado de una obra es su presupuesto por el porcentaje de
@@ -254,9 +266,7 @@ No son defectos. Reportarlas hace ruido.
 - **La documentación se guarda como enlace**, no se suben archivos. Es una decisión
   de diseño: el servidor no conserva archivos entre reinicios.
 - **Faltan estados de obra** respecto de lo diagramado: no existen "cancelada" ni
-  "en revisión". Registrar un período de inactividad **sí** pausa la obra, y
-  cerrarlo la reactiva. Está
-  documentado en `REVISION-TPS.md`.
+  "en revisión". Está documentado en `REVISION-TPS.md`.
 - **El sistema no tiene pruebas automatizadas.**
 
 ---

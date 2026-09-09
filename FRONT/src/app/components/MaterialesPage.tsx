@@ -58,7 +58,7 @@ export default function MaterialesPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><Package className="w-7 h-7" /> Gestión de Materiales</h2>
-        <p className="text-muted-foreground mt-2">Asignación y consumo de materiales por obra (RF10), con alerta de exceso (RF12).</p>
+        <p className="text-muted-foreground mt-2">Asignación y consumo de materiales por obra, con alerta de exceso.</p>
       </div>
 
       <Card><CardContent className="pt-6">

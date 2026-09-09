@@ -111,7 +111,7 @@ export default function MaquinariaPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><Wrench className="w-7 h-7" /> Gestión de Maquinaria</h2>
-          <p className="text-muted-foreground mt-2">Uso de equipos (RF23), fallas (RF27) y rendimiento por operario (RF28).</p>
+          <p className="text-muted-foreground mt-2">Uso de equipos, fallas y rendimiento por operario.</p>
         </div>
       </div>
 
@@ -163,7 +163,7 @@ export default function MaquinariaPage() {
           <CardContent className="space-y-6">
             {/* Registro de uso (RF23) */}
             <div className="space-y-3">
-              <h4 className="font-semibold">Registro de uso (RF23)</h4>
+              <h4 className="font-semibold">Registro de uso</h4>
               {carga && (
                 <form onSubmit={guardarReg} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
                   <div className="space-y-1 col-span-2 md:col-span-6"><Label>Obra (opcional)</Label>
@@ -202,7 +202,7 @@ export default function MaquinariaPage() {
 
             {/* Fallas (RF27) */}
             <div className="space-y-3">
-              <h4 className="font-semibold">Historial de fallas (RF27)</h4>
+              <h4 className="font-semibold">Historial de fallas</h4>
               {carga && (
                 <form onSubmit={guardarFalla} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
                   <div className="space-y-1"><Label htmlFor="ff">Fecha</Label><Input id="ff" type="date" required value={formFalla.fecha} onChange={(e) => setFormFalla({ ...formFalla, fecha: e.target.value })} /></div>
@@ -233,7 +233,7 @@ export default function MaquinariaPage() {
       {/* Rendimiento por operario (RF28) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Rendimiento por operario (RF28)</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Rendimiento por operario</CardTitle>
           <CardDescription>Comparativa de producción entre operarios.</CardDescription>
         </CardHeader>
         <CardContent>

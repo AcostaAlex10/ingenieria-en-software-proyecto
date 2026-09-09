@@ -64,7 +64,7 @@ export default function SeguimientoPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground flex items-center gap-2"><Activity className="w-7 h-7" /> Seguimiento Operativo</h2>
-        <p className="text-muted-foreground mt-2">Asistencia del personal (RF06) e incidencias externas (RF09) por obra.</p>
+        <p className="text-muted-foreground mt-2">Asistencia del personal e incidencias externas por obra.</p>
       </div>
 
       <Card><CardContent className="pt-6">

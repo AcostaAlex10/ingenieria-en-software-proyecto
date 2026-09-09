@@ -7,7 +7,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Layers, Wallet, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Play, Layers, Wallet, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
@@ -28,6 +28,7 @@ import {
   type PeriodoInactividad, type ItemExcedente,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeRegistrarAvance, puedeCargarDocumentos, puedeVerCostos } from "../auth/permisos";
+import { etiquetaEstado } from "../estadosObra";
 
 // Fecha de HOY en zona horaria LOCAL (no UTC), para que de noche en Argentina
 // no muestre el día siguiente.
@@ -396,9 +397,9 @@ export default function ProyectoDetallePage() {
     if (!id) return;
     try {
       const cerrado = await cerrarInactividad(idP);
-      toast.success("Período cerrado");
       setInactividades(await listarInactividades(id));
-      aplicarEstadoObra(cerrado.estado_proyecto);
+      if (cerrado.estado_proyecto) aplicarEstadoObra(cerrado.estado_proyecto);
+      else toast.success("Período cerrado");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al cerrar el período");
     }
@@ -441,6 +442,9 @@ export default function ProyectoDetallePage() {
     }
   }
 
+  // El período que mantiene pausada la obra, si hay uno. Alimenta el aviso de arriba.
+  const periodoVigente = inactividades.find((p) => p.vigente) ?? null;
+
   if (loading) return <div className="text-center text-muted-foreground py-12">Cargando obra...</div>;
   if (!proyecto) return (
     <div className="space-y-4">
@@ -455,6 +459,30 @@ export default function ProyectoDetallePage() {
         <ArrowLeft className="w-4 h-4" /> Volver a proyectos
       </Button>
 
+      {/* Obra pausada: que se note sin tener que bajar hasta la tarjeta de inactividad. */}
+      {proyecto.estado === "pausada" && (
+        <div
+          className="rounded-lg border-2 px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+          style={{ borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.10)" }}
+          role="status"
+        >
+          <Pause className="w-7 h-7 shrink-0" style={{ color: "#ef4444" }} />
+          <div className="flex-1 min-w-[240px]">
+            <p className="font-semibold text-lg leading-tight" style={{ color: "#ef4444" }}>Obra pausada</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {periodoVigente
+                ? <>Desde el {fmtFecha(periodoVigente.fecha_inicio)} · {periodoVigente.motivo}</>
+                : "No hay ningún período de inactividad abierto."}
+            </p>
+          </div>
+          {cargaDocs && periodoVigente && (
+            <Button className="gap-2" onClick={() => cerrarPeriodo(periodoVigente.id_periodo)}>
+              <Play className="w-4 h-4" /> Continuar obra
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Datos de la obra */}
       <Card>
         <CardHeader>
@@ -463,7 +491,7 @@ export default function ProyectoDetallePage() {
               <CardTitle className="text-2xl">{proyecto.nombre}</CardTitle>
               <CardDescription className="mt-1">{proyecto.tipo}</CardDescription>
             </div>
-            <Badge variant="secondary">{proyecto.estado}</Badge>
+            <Badge variant={proyecto.estado === "pausada" ? "destructive" : "secondary"}>{etiquetaEstado(proyecto.estado)}</Badge>
           </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-muted-foreground">
@@ -553,7 +581,7 @@ export default function ProyectoDetallePage() {
                       </div>
                       <div className="space-y-1">
                         <Label>Fin</Label>
-                        <Input type="date" required value={formEditEtapa.fecha_fin}
+                        <Input type="date" required min={formEditEtapa.fecha_inicio} value={formEditEtapa.fecha_fin}
                           onChange={(ev) => setFormEditEtapa({ ...formEditEtapa, fecha_fin: ev.target.value })} />
                       </div>
                       {verCostos && (
@@ -626,7 +654,7 @@ export default function ProyectoDetallePage() {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="eff">Fin</Label>
-                    <Input id="eff" type="date" required value={formEtapa.fecha_fin}
+                    <Input id="eff" type="date" required min={formEtapa.fecha_inicio} value={formEtapa.fecha_fin}
                       onChange={(e) => setFormEtapa({ ...formEtapa, fecha_fin: e.target.value })} />
                   </div>
                   {verCostos && (
@@ -1015,7 +1043,7 @@ export default function ProyectoDetallePage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="if">Hasta (opcional)</Label>
-                <Input id="if" type="date" value={formInac.fecha_fin} onChange={(e) => setFormInac({ ...formInac, fecha_fin: e.target.value })} />
+                <Input id="if" type="date" min={formInac.fecha_inicio} value={formInac.fecha_fin} onChange={(e) => setFormInac({ ...formInac, fecha_fin: e.target.value })} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="im">Motivo</Label>
@@ -1036,7 +1064,7 @@ export default function ProyectoDetallePage() {
                   <span className="flex-1">{p.motivo}</span>
                   {p.vigente && <Badge variant="destructive">Obra pausada</Badge>}
                   {cargaDocs && p.vigente && (
-                    <Button size="sm" variant="outline" onClick={() => cerrarPeriodo(p.id_periodo)} title="Cerrar el período y reactivar la obra">Cerrar</Button>
+                    <Button size="sm" className="gap-1" onClick={() => cerrarPeriodo(p.id_periodo)} title="Cierra el período y la obra vuelve a ejecución"><Play className="w-3 h-3" /> Continuar obra</Button>
                   )}
                   {cargaDocs && (
                     <Button size="sm" variant="ghost" onClick={() => borrarInactividad(p.id_periodo)} title="Eliminar"><Trash2 className="w-4 h-4" style={{ color: "#ef4444" }} /></Button>

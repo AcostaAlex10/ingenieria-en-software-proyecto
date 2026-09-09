@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { DistribucionProyectosChart, PresupuestoChart } from "./ChartsPanel";
 import { listarProyectos, type Proyecto } from "../api/proyectos";
 import { puedeVerCostos } from "../auth/permisos";
+import { ESTADOS_OBRA, etiquetaEstado, colorEstado } from "../estadosObra";
 
 const modules = [
   { title: "Proyectos", icon: FolderKanban, link: "/proyectos", accent: "#3b82f6" },
@@ -18,20 +19,11 @@ const modules = [
 ];
 
 // Etiqueta y color por estado de la obra.
-// Los siete estados del ENUM. La distribucion se arma iterando este mapa, asi
-// que un estado que falte aca no aparece en el grafico (los de valor 0 se
-// filtran despues, de modo que agregar los que todavia no se usan no molesta).
-const ESTADOS: Record<string, { label: string; color: string }> = {
-  creada: { label: "Creada", color: "#94a3b8" },
-  planificacion: { label: "Planificación", color: "#3b82f6" },
-  en_ejecucion: { label: "En ejecución", color: "#22c55e" },
-  pausada: { label: "Pausada", color: "#ef4444" },
-  en_revision: { label: "En revisión", color: "#f59e0b" },
-  finalizada: { label: "Finalizada", color: "#a855f7" },
-  cancelada: { label: "Cancelada", color: "#78716c" },
-};
+// La distribucion se arma iterando ESTADOS_OBRA, asi que un estado que falte
+// ahi no aparece en el grafico (los de valor 0 se filtran despues).
+const ESTADOS = ESTADOS_OBRA;
 function estadoInfo(estado: string) {
-  return ESTADOS[estado] ?? { label: estado, color: "#64748b" };
+  return { label: etiquetaEstado(estado), color: colorEstado(estado) };
 }
 function pesos(n: number) {
   return "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 0 });
