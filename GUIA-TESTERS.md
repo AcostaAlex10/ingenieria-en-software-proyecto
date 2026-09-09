@@ -84,6 +84,7 @@ operación se rechaza igual si se la invoca directamente.
 | Ver obras, análisis y reportes | sí | sí | sí | sí |
 | Ver el presupuesto de la obra | sí | sí | **no** | sí |
 | Crear, editar y eliminar obras | sí | sí | no | no |
+| Cancelar una obra | sí | sí | no | no |
 | Cargar planificación y etapas | sí | sí | no | no |
 | Asignar materiales a una obra | sí | sí | no | no |
 | Registrar avance físico | sí | no | sí | no |
@@ -182,11 +183,21 @@ Sirven para saber qué resultado es el correcto.
 
 **Estados de la obra**
 
-Cambian solos a partir del avance físico, no se eligen a mano:
+Casi todos cambian solos; el único que se elige a mano es la cancelación.
 
 - `planificación` → `en ejecución` con el primer avance mayor a cero.
 - `en ejecución` → `finalizada` al llegar al 100 %.
+- `en ejecución` → `pausada` al registrar un período de inactividad vigente, y
+  vuelve a `en ejecución` cuando ese período se cierra o se elimina.
+- `en ejecución` o `pausada` → `cancelada`, desde el campo Estado del formulario
+  de edición de la obra. Es la única transición manual, y solo la pueden hacer
+  el Administrador y el Administrativo.
 - El avance de la obra es el mayor porcentaje registrado.
+
+Sobre la cancelación vale la pena probar los bordes: el campo Estado no ofrece
+ningún otro valor, aparece deshabilitado en una obra que no está en marcha, y el
+servidor rechaza por su cuenta tanto asignar otro estado a mano como cancelar una
+obra en planificación o ya finalizada.
 
 **Planificación y avance**
 
@@ -265,8 +276,8 @@ No son defectos. Reportarlas hace ruido.
 - **La pantalla de Maquinaria tarda unos segundos** en mostrar el contenido.
 - **La documentación se guarda como enlace**, no se suben archivos. Es una decisión
   de diseño: el servidor no conserva archivos entre reinicios.
-- **Faltan estados de obra** respecto de lo diagramado: no existen "cancelada" ni
-  "en revisión". Está documentado en `REVISION-TPS.md`.
+- **Falta un estado de obra** respecto de lo diagramado: no existe "en revisión".
+  Está documentado en `REVISION-TPS.md`.
 - **El sistema no tiene pruebas automatizadas.**
 
 ---

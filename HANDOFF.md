@@ -137,6 +137,19 @@ Sobre eso, lo que se agregó en la sesión del 9 de septiembre:
   rangos de fecha invertidos y etapas sin validar, que PHP ya rechazaba.
 - **Códigos RF fuera de la interfaz**: 16 apariciones en 6 pantallas.
 
+Y en la sesión siguiente:
+
+- **Cancelación de obra.** El formulario de edición incorpora el campo estado,
+  con `cancelada` como única opción manual y solo desde `en_ejecucion` o
+  `pausada`, restringido a los roles de gestión de obra. `ProyectoController` y
+  el simulador rechazan lo mismo: `422` si se intenta asignar a mano cualquier
+  otro estado, `409` si la obra no admite cancelarse. El alta ignora el estado
+  que reciba.
+- **Arreglo de la edición de obras.** El campo de fecha de inicio llevaba el
+  piso de hoy también al editar, así que el navegador daba por inválido el
+  formulario de cualquier obra ya empezada: no se podía guardar ningún cambio.
+  Ahora el piso aplica solo al alta, como en `ProyectoController::registrar()`.
+
 El TP4 está cerrado. La demo estática está publicada y verificada.
 
 ---
@@ -154,20 +167,18 @@ Aiven, como explica el aviso de la sección 1.
    y documentar la desviación con su fundamento en `DOCUMENTACION.md` —hoy solo
    figura en la guía de testers, que la cátedra no lee—. Es una decisión de
    grupo, no una tarea.
-2. **Permitir cancelar una obra.** Es el único estado terminal del TP3 que el
-   sistema no ofrece, y el formulario no incluye el campo estado.
-3. **Incorporar `EnRevision` para el proyecto**, ligado a la aprobación del
+2. **Incorporar `EnRevision` para el proyecto**, ligado a la aprobación del
    reporte final. El más invasivo, y arrastra una decisión: el TP3 dice que la
    obra se finaliza cuando el supervisor aprueba, y `AvanceController` la
    finaliza sola al 100 %. Las dos reglas no conviven; hay que elegir antes de
    escribir código.
-4. **Completar RF26**: `incidencia.gravedad` clasifica, pero no dispara los
+3. **Completar RF26**: `incidencia.gravedad` clasifica, pero no dispara los
    protocolos de notificación que pide el requerimiento. `Mailer` ya funciona.
-5. **Llevar la alerta de maquinaria a la pantalla de Alertas.** RF24 está
+4. **Llevar la alerta de maquinaria a la pantalla de Alertas.** RF24 está
    cumplido —`MaquinariaController` compara contra el promedio de cada máquina—
    pero esa alerta no llega a `AnalisisController`, que solo emite las de avance
    y material.
-6. **Distinguir `Creado` de `Planificado`.**
+5. **Distinguir `Creado` de `Planificado`.**
 
 **De la documentación**: quedan **C1, C2 y C3**, que son ediciones sobre el PDF
 del TP2 (los actores del diagrama, y el nombre y las condiciones del CU22) y no

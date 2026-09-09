@@ -190,10 +190,19 @@ snake_case de la base. Tres todavía no los asigna nadie:
 | Pausado | `pausada` | `InactividadController` con un período vigente |
 | EnRevision | `en_revision` | nadie |
 | Finalizado | `finalizada` | `AvanceController` al llegar al 100 % |
-| Cancelado | `cancelada` | nadie |
+| Cancelado | `cancelada` | el formulario de obra, con rol de gestión |
 
-Esos tres huecos son la brecha que detalla `REVISION-TPS.md`. El `ENUM`
-existe para que la base no acepte un estado inventado mientras se cierran.
+Quedan dos huecos —`creada` y `en_revision`—, la brecha que detalla
+`REVISION-TPS.md`. El `ENUM` existe para que la base no acepte un estado
+inventado mientras se cierran.
+
+**Cancelar es el único cambio de estado manual.** El resto los mueve el sistema,
+y por eso el formulario de obra ofrece `cancelada` y nada más: aceptar cualquier
+estado por `PUT` dejaría a la obra en un valor que el próximo recálculo pisa, o
+en uno incoherente con sus avances y sus paradas. `ProyectoController::modificar()`
+rechaza con `422` cualquier otro estado, y con `409` la cancelación de una obra
+que no está en ejecución ni pausada, que son los dos orígenes que traza el TP3.
+El alta ignora el estado que reciba: toda obra nueva arranca en `planificacion`.
 
 Un período de inactividad está **vigente** si ya empezó y todavía no terminó.
 `fecha_fin` es el día en que la obra vuelve a arrancar, no el último día parado:

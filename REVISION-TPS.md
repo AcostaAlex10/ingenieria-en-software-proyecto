@@ -115,16 +115,17 @@ El TP3 define siete estados. El sistema usa cuatro, y con otros nombres.
 | Creado | — | No existe. Una obra nace directamente en `planificacion` |
 | Planificado | `planificacion` | Existe, pero fusiona Creado y Planificado |
 | EnEjecucion | `en_ejecucion` | Correcto |
-| Pausado | `pausada` | El valor existe, pero nada lo asigna |
+| Pausado | `pausada` | Correcto: lo asigna `InactividadController` |
 | EnRevision | — | **No existe** |
 | Finalizado | `finalizada` | Existe, pero se alcanza por otro camino |
-| Cancelado | — | **No existe** |
+| Cancelado | `cancelada` | Correcto: se asigna desde el formulario de obra |
 
 Detalle de lo verificado en el código:
 
-- `back/sql/schema.sql` define `proyecto.estado` como `VARCHAR(30)` con valor por
-  defecto `'planificacion'`, sin restricción de valores. Al no ser un `ENUM`,
-  nada impide guardar un estado inválido.
+- `back/sql/schema.sql` define `proyecto.estado` como `ENUM` con los siete
+  estados y valor por defecto `'planificacion'`. En la base ya desplegada sigue
+  siendo `VARCHAR(30)` hasta que se corra `back/sql/migracion-estado-enum.php`:
+  `migrar.php` no aplica cambios de tipo sobre tablas que ya existen.
 - `AvanceController::sincronizarProyecto()` es lo único que cambia el estado:
   pasa de `planificacion` a `en_ejecucion` con el primer avance mayor a cero, y a
   `finalizada` al llegar al 100 %.
@@ -135,8 +136,9 @@ Detalle de lo verificado en el código:
 - `ReporteController` no modifica el proyecto. Aprobar el reporte final no lleva
   la obra a `Finalizado`, como establece el diagrama; el sistema la finaliza por
   porcentaje de avance.
-- El formulario de alta y edición de obras no incluye el campo estado, así que no
-  hay forma de pausar ni cancelar una obra desde la interfaz.
+- El formulario de edición de obras incluye el campo estado, con `cancelada` como
+  única opción manual y solo desde una obra en ejecución o pausada. Pausar no se
+  hace desde ahí: lo dispara el registro de un período de inactividad.
 
 ### 2.2. Estados del reporte: el código tiene uno que el diagrama no
 
@@ -185,8 +187,9 @@ documentadas que no se construyeron. En orden de esfuerzo:
    cambio de esquema de una línea y evita estados inválidos.
 2. **Pausar la obra al registrar un período de inactividad**, y reactivarla al
    cerrarlo. `InactividadController` ya recibe el `id_proyecto` y las fechas.
-3. **Permitir cancelar una obra** desde la interfaz, con el rol correspondiente.
-   Es el único estado terminal que el TP3 define y el sistema no ofrece.
+3. ~~**Permitir cancelar una obra** desde la interfaz, con el rol
+   correspondiente.~~ Hecho: el formulario de edición ofrece `cancelada` a los
+   roles de gestión de obra, desde `en_ejecucion` o `pausada`.
 4. **Incorporar `EnRevision` para el proyecto**, conectado al circuito de
    aprobación de reportes: al aprobarse el reporte final, la obra pasa a
    `Finalizado`. Es el cambio más invasivo, porque toca la relación entre el

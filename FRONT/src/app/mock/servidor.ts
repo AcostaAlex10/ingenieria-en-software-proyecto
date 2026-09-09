@@ -11,6 +11,7 @@
  * la autorizacion real del servidor. Es un doble de prueba de la interfaz.
  */
 import base from "./datos.json";
+import { ESTADOS_CANCELABLES } from "../estadosObra";
 
 /**
  * Hash FNV-1a de 32 bits, en base 36. No es criptografico: solo sirve para
@@ -958,7 +959,9 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
         ubicacion: texto(cuerpo.ubicacion),
         encargado: texto(cuerpo.encargado),
         fechaInicio: texto(cuerpo.fechaInicio),
-        estado: texto(cuerpo.estado) || "planificacion",
+        // Toda obra nueva arranca en 'planificacion', igual que en PHP: si el
+        // alta aceptara un estado, se saltearia la regla de transicion.
+        estado: "planificacion",
         avance: num(cuerpo.avance),
         presupuesto: num(cuerpo.presupuesto),
       };
@@ -976,6 +979,27 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       const veto = exige(ROLES_GESTION_OBRA);
       if (veto) return veto;
       if (metodo === "PUT") {
+        // Mismo control que ProyectoController::modificar(): cancelar es el
+        // unico cambio de estado manual, y solo desde una obra en marcha. Si
+        // el estado que llega es el que ya tiene, no hay nada que revisar.
+        if (cuerpo.estado !== undefined) {
+          const estadoNuevo = texto(cuerpo.estado);
+          if (estadoNuevo !== "" && estadoNuevo !== texto(obra.estado)) {
+            if (estadoNuevo !== "cancelada") {
+              return json(422, {
+                errors: {
+                  estado:
+                    'El unico estado que se asigna a mano es "cancelada"; el resto los mueve el sistema',
+                },
+              });
+            }
+            if (!ESTADOS_CANCELABLES.includes(texto(obra.estado))) {
+              return json(409, {
+                error: "Solo se puede cancelar una obra en ejecucion o pausada",
+              });
+            }
+          }
+        }
         for (const campo of ["nombre", "tipo", "ubicacion", "encargado", "fechaInicio", "estado"]) {
           if (cuerpo[campo] !== undefined) obra[campo] = texto(cuerpo[campo]);
         }

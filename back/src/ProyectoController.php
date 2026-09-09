@@ -22,6 +22,22 @@ final class ProyectoController
         'presupuesto',
     ];
 
+    /**
+     * Cancelar es el unico cambio de estado que hace una persona a mano. El
+     * resto los mueve el sistema: AvanceController con los avances fisicos e
+     * InactividadController con los periodos de parada. Aceptar cualquier
+     * estado por PUT dejaria a la obra en un valor que el proximo recalculo
+     * pisa, o peor, en uno incoherente con sus datos.
+     */
+    private const ESTADO_MANUAL = 'cancelada';
+
+    /**
+     * El TP3 traza la cancelacion desde EnEjecucion y desde Pausado. Una obra
+     * que todavia no arranco se elimina, no se cancela; y una terminada ya es
+     * un estado final. El frontend valida lo mismo en estadosObra.ts.
+     */
+    private const ESTADOS_CANCELABLES = ['en_ejecucion', 'pausada'];
+
     public function __construct(private ProyectoRepositoryInterface $repositorio)
     {
     }
@@ -95,6 +111,10 @@ final class ProyectoController
             return;
         }
 
+        // Toda obra nueva arranca en 'planificacion'. Sin esto, un POST podria
+        // crear una obra ya cancelada y saltearse la regla de transicion.
+        unset($datos['estado']);
+
         $proyecto = $this->repositorio->crear($datos);
         $this->responderJson(201, $proyecto);
     }
@@ -102,7 +122,9 @@ final class ProyectoController
     /** @param array<string, mixed> $datos */
     public function modificar(string $id, array $datos): void
     {
-        if ($this->repositorio->buscarPorId($id) === null) {
+        $actual = $this->repositorio->buscarPorId($id);
+
+        if ($actual === null) {
             $this->responderJson(404, ['error' => 'Proyecto no encontrado']);
             return;
         }
@@ -112,6 +134,29 @@ final class ProyectoController
         if (!empty($errores)) {
             $this->responderJson(422, ['errors' => $errores]);
             return;
+        }
+
+        // Cambio de estado: solo se admite cancelar, y solo desde una obra en
+        // marcha. Si el estado que llega es el mismo que ya tiene, no hay nada
+        // que revisar: el formulario manda la obra entera en cada edicion.
+        if (array_key_exists('estado', $datos)) {
+            $estadoNuevo = trim((string) $datos['estado']);
+
+            if ($estadoNuevo !== '' && $estadoNuevo !== $actual['estado']) {
+                if ($estadoNuevo !== self::ESTADO_MANUAL) {
+                    $this->responderJson(422, ['errors' => [
+                        'estado' => 'El unico estado que se asigna a mano es "cancelada"; el resto los mueve el sistema',
+                    ]]);
+                    return;
+                }
+
+                if (!in_array($actual['estado'], self::ESTADOS_CANCELABLES, true)) {
+                    $this->responderJson(409, [
+                        'error' => 'Solo se puede cancelar una obra en ejecucion o pausada',
+                    ]);
+                    return;
+                }
+            }
         }
 
         if ($this->repositorio->existeDuplicado($datos['nombre'], $datos['ubicacion'], $id)) {
