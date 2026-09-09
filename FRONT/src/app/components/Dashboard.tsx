@@ -18,11 +18,17 @@ const modules = [
 ];
 
 // Etiqueta y color por estado de la obra.
+// Los siete estados del ENUM. La distribucion se arma iterando este mapa, asi
+// que un estado que falte aca no aparece en el grafico (los de valor 0 se
+// filtran despues, de modo que agregar los que todavia no se usan no molesta).
 const ESTADOS: Record<string, { label: string; color: string }> = {
+  creada: { label: "Creada", color: "#94a3b8" },
   planificacion: { label: "Planificación", color: "#3b82f6" },
   en_ejecucion: { label: "En ejecución", color: "#22c55e" },
   pausada: { label: "Pausada", color: "#ef4444" },
+  en_revision: { label: "En revisión", color: "#f59e0b" },
   finalizada: { label: "Finalizada", color: "#a855f7" },
+  cancelada: { label: "Cancelada", color: "#78716c" },
 };
 function estadoInfo(estado: string) {
   return ESTADOS[estado] ?? { label: estado, color: "#64748b" };

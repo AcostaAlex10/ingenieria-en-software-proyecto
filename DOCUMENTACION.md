@@ -151,13 +151,74 @@ documentación, los reportes y los períodos de inactividad.
 
 ### Estados
 
-- **Proyecto** (`proyecto.estado`, valor inicial `planificacion`):
-  `planificacion` → `en_ejecucion` ⇄ `pausada` → `finalizada`.
-- **Reporte** (`reporte.estado`, valor inicial `borrador`):
-  `borrador` → `en_revision` → `aprobado`, o `rechazado` y vuelta a `borrador`.
+El modelo del TP3 y lo que hace el código no coinciden del todo. Se documentan
+los dos por separado: en un caso la diferencia es deliberada, en el otro es una
+brecha pendiente.
+
+#### Proyecto
+
+Los siete estados del TP3 y sus transiciones, ya con las dos correcciones del
+docente incorporadas:
+
+```
+Creado → Planificado → EnEjecucion ⇄ Pausado
+                            ↕           ↑
+                        EnRevision ─────┘
+                            ↓
+                        Finalizado        (y Cancelado desde
+                                           EnEjecucion o Pausado)
+```
+
+| Transición | Qué la dispara |
+|---|---|
+| `EnEjecucion → Pausado` | se registra un período de inactividad |
+| `EnRevision → Pausado` | ídem, con la obra en revisión — **corrección C4** |
+| `Pausado → EnEjecucion` | se cierra el período de inactividad |
+| `EnEjecucion → EnRevision` | el Personal Técnico completa el reporte final |
+| `EnRevision → EnEjecucion` | el supervisor rechaza el reporte |
+| `EnRevision → Finalizado` | el supervisor aprueba reporte y certificación |
+| `EnEjecucion → Cancelado`, `Pausado → Cancelado` | decisión gerencial |
+
+`proyecto.estado` es un `ENUM` con los siete valores, en la convención
+snake_case de la base. Cuatro todavía no los asigna nadie:
+
+| TP3 | En la base | Quién lo asigna hoy |
+|---|---|---|
+| Creado | `creada` | nadie |
+| Planificado | `planificacion` | valor inicial de toda obra nueva |
+| EnEjecucion | `en_ejecucion` | `AvanceController` con el primer avance mayor a cero |
+| Pausado | `pausada` | nadie |
+| EnRevision | `en_revision` | nadie |
+| Finalizado | `finalizada` | `AvanceController` al llegar al 100 % |
+| Cancelado | `cancelada` | nadie |
+
+Esos cuatro huecos son la brecha que detalla `REVISION-TPS.md`. El `ENUM`
+existe para que la base no acepte un estado inventado mientras se cierran.
+
+#### Reporte
+
+El TP3 diagrama `Borrador → EnRevision → Aprobado`, con el rechazo devolviendo
+el reporte a `Borrador`. El código va más allá y conserva `rechazado` como
+estado propio, lo que permite distinguir un borrador nunca enviado de uno
+devuelto con observaciones; el motivo queda en `observacion_revision`. Esa
+diferencia es una mejora, no un defecto: lo que falta es que el diagrama la
+refleje.
+
+Falta `Cancelado` — **corrección C5** —, alcanzable desde `Borrador` (el técnico
+descarta un reporte que no va a enviar) y desde `Rechazado`. Ni el diagrama ni
+el código lo tienen todavía.
+
+`reporte.estado` es `ENUM('borrador','en_revision','aprobado','rechazado')`,
+con valor inicial `borrador`.
+
+#### Los demás
+
 - **Asistencia**: `presente` | `ausente` | `tarde`.
 - **Incidencia**: tipo `clima` | `falla_maquinaria` | `proveedor` | `otro`;
   gravedad `baja` | `media` | `alta`.
+
+> Nomenclatura: los TP usan PascalCase (`EnEjecucion`) y la base snake_case en
+> minúscula (`en_ejecucion`). Es una convención distinta, no una inconsistencia.
 
 ---
 
@@ -168,8 +229,8 @@ documentación, los reportes y los períodos de inactividad.
 | HU | Funcionalidad | RF asociados | Estado |
 |---|---|---|---|
 | HU16 | Autenticación y control de acceso: login, roles base, sesión | RF19, RF20 (parcial) | Implementado |
-| HU01 | Gestión de Proyectos: registrar, modificar, eliminar, organizar por obra | RF01, RF02, RF03 | Implementado |
-| HU02 | Planificación inicial de la obra (avance esperado) | RF05, RF11, RF14 | Implementado |
+| HU01 | Gestión de Proyectos: registrar, modificar, eliminar, organizar por obra | RF01, RF02 | Implementado |
+| HU02 | Planificación inicial de la obra (avance esperado) | RF03, RF05, RF11, RF14 | Implementado |
 | HU04 | Registro de avance físico y comparación esperado contra real | RF14 | Implementado |
 | HU12, HU13 | Dashboard de indicadores | RF05, RF06 | Implementado |
 

@@ -115,7 +115,7 @@ FRONT/          SPA React (páginas en src/app/components, rutas en src/app/rout
 back/           API REST en PHP — backend del proyecto
   public/       front controller (index.php) y .htaccess
   src/          controladores, middleware de auth, acceso a datos
-  sql/          schema.sql, migrar.php, seed.php
+  sql/          schema.sql, migrar.php, migracion-estado-enum.php, seed.php
 back-node/      API equivalente en Node/Express (no desplegada)
 Intalar/        instalador de Node y comandos de ayuda para el equipo
 ```

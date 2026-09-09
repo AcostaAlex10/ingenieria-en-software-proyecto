@@ -25,12 +25,19 @@ const HOY = (() => {
 })();
 const fmtFecha = (s: string) => new Date(s + "T00:00:00").toLocaleDateString("es-AR");
 
+// Los siete estados del ENUM de proyecto.estado. Tres todavia no los asigna
+// ningun controlador, pero se etiquetan igual: antes el default decia
+// "Planificación" y una obra cancelada se mostraba como planificada.
 function estadoBadge(estado: string) {
   switch (estado) {
+    case "creada": return <Badge variant="secondary">Creada</Badge>;
+    case "planificacion": return <Badge variant="secondary">Planificación</Badge>;
     case "en_ejecucion": return <Badge className="bg-green-600">En Ejecución</Badge>;
     case "pausada": return <Badge variant="destructive">Pausada</Badge>;
+    case "en_revision": return <Badge className="bg-amber-600">En revisión</Badge>;
     case "finalizada": return <Badge variant="outline">Finalizada</Badge>;
-    default: return <Badge variant="secondary">Planificación</Badge>;
+    case "cancelada": return <Badge variant="outline">Cancelada</Badge>;
+    default: return <Badge variant="secondary">{estado}</Badge>;
   }
 }
 

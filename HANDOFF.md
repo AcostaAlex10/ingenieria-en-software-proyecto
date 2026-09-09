@@ -76,6 +76,7 @@ back/             API REST en PHP 8 sin framework — este es el backend
   public/index.php      front controller: rutas, token y roles
   src/                  un controlador por recurso
   sql/                  schema.sql (17 tablas), migrar.php, seed.php
+                        migracion-estado-enum.php (cambios de tipo)
 back-node/        API equivalente en Node — NO se despliega, no tocar
 ```
 
