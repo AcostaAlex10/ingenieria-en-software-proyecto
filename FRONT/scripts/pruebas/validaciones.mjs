@@ -37,7 +37,14 @@ await entrar();
 
 // ---- 1. El navegador frena la fecha invertida (primera barrera) ----
 await irA('/proyectos/1');
-const hoy = new Date().toISOString().slice(0, 10);
+// La fecha de hoy en la zona horaria LOCAL, igual que la calcula la app en
+// ProyectosPage.tsx. Con toISOString() a secas se obtiene la fecha UTC, que
+// entre las 21 y la medianoche en Argentina ya es la del dia siguiente: la
+// prueba fallaba sola si se corria de noche, sin que la app tuviera nada malo.
+const hoy = (() => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+})();
 chequear('el campo «Hasta» lleva min = la fecha de inicio',
   (await page.locator('#if').getAttribute('min')) === hoy, String(await page.locator('#if').getAttribute('min')));
 await escribir('if', '2025-01-01');
