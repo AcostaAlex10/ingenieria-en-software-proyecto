@@ -4,7 +4,7 @@ Punto de entrada para retomar el trabajo desde otra máquina, otra sesión o la
 nube. Resume dónde está cada cosa, qué está hecho, qué falta y con qué trampas
 ya nos topamos.
 
-Última actualización: 31 de agosto de 2026.
+Última actualización: 9 de septiembre de 2026.
 
 ---
 
@@ -12,14 +12,42 @@ ya nos topamos.
 
 **Repositorio:** `AcostaAlex10/ingenieria-en-software-proyecto` — público.
 
-**Rama de trabajo: `testing`.** Es donde está todo lo último. `main` va algunos
-commits atrás; si trabajás desde la nube, empezá por `testing` o mergeala a
-`main` primero.
+> ### Las dos migraciones de esquema ya están corridas
+>
+> Verificado contra Aiven el 9 de septiembre de 2026: `proyecto.estado` es un
+> ENUM con los siete valores (incluidos `en_revision` y `cancelada`) y existe
+> `reporte.es_final TINYINT(1)`. No hay nada pendiente que correr.
+>
+> Queda anotado porque es la trampa que nos costó un intento: los cambios de
+> esquema no alteran una base que ya existe. `migrar.php` solo ejecuta
+> `schema.sql`, y todas sus tablas usan `CREATE TABLE IF NOT EXISTS`. Agregar
+> una columna ahí no tiene ningún efecto sobre una base viva, por eso cada
+> cambio de esquema necesita su propio script en `back/sql/`.
+>
+> Si alguna vez hay que correr uno, las credenciales salen de `back/.env`
+> (copiado de `back/.env.example`); ya no hace falta exportar variables a mano:
+>
+> ```powershell
+> php back/sql/migracion-estado-enum.php
+> php back/sql/migracion-reporte-final.php
+> ```
+>
+> Los dos son idempotentes: si el cambio ya está, avisan y salen sin tocar nada.
+> Los valores para `back/.env` están en Render, en el servicio del backend,
+> sección Environment.
+
+**Rama de trabajo: `main`.** Ahí va todo el desarrollo, y ahí despliegan Vercel
+y Render.
+
+**`testing` está congelada a propósito.** Es la rama de la demo estática que usa
+el equipo de testers, y es la única que dispara el workflow de Pages. No la
+muevas sin acordarlo: actualizarla les cambia el sitio bajo los pies. Hoy está
+11 commits atrás de `main`.
 
 ```bash
 git clone https://github.com/AcostaAlex10/ingenieria-en-software-proyecto.git
 cd ingenieria-en-software-proyecto
-git checkout testing
+git checkout main
 ```
 
 **Qué leer, en este orden:**
@@ -29,7 +57,8 @@ git checkout testing
 | `README.md` | arquitectura y cómo levantar el sistema |
 | `DOCUMENTACION.md` | contexto del proyecto, modelo de datos, trazabilidad con los TP |
 | `REVISION-TPS.md` | correcciones del docente y divergencias entre los TP y el código |
-| `GUIA-TESTERS.md` | lo que necesita un equipo externo para probar |
+| `RESUMEN-TPS.md` | qué dice cada uno de los cuatro TP y en qué quedó |
+| `GUIA-TESTERS.md` | lo que necesita un equipo externo para probar, con la tabla de los 28 RF |
 | `FRONT/MODO-PRUEBA.md` | el modo estático: cómo funciona y cómo publicarlo |
 | `DEPLOY.md` | despliegue en la nube |
 | `back/README.md` | la API PHP en detalle |
@@ -76,7 +105,7 @@ back/             API REST en PHP 8 sin framework — este es el backend
   public/index.php      front controller: rutas, token y roles
   src/                  un controlador por recurso
   sql/                  schema.sql (17 tablas), migrar.php, seed.php
-                        migracion-estado-enum.php (cambios de tipo)
+                        migracion-*.php (cambios de esquema, uno por cambio)
 back-node/        API equivalente en Node — NO se despliega, no tocar
 ```
 
@@ -101,27 +130,65 @@ Los roles y permisos (RF19) se aplican en el servidor, y el Personal Técnico no
 recibe el presupuesto (RF20). Verificado contra producción y contra el modo
 estático.
 
+Sobre eso, lo que se agregó en la sesión del 9 de septiembre:
+
+- **Pausa de obra por inactividad (RF25 y el ciclo del TP3).** Registrar un
+  período vigente pasa la obra a `pausada`; cerrarlo con **Continuar obra**, o
+  eliminarlo, la devuelve a `en_ejecucion`. Endpoint nuevo:
+  `PUT /api/proyectos/inactividad/{id}`.
+- **`proyecto.estado` como `ENUM`** con los siete estados del TP3 — falta correr
+  la migración contra la base desplegada, ver el aviso de arriba.
+- **Correcciones C4 y C5 del docente** aplicadas en `DOCUMENTACION.md`, y RF03
+  reasignado de HU01 a HU02.
+- **Validaciones del simulador** puestas a la par del backend: el mock aceptaba
+  rangos de fecha invertidos y etapas sin validar, que PHP ya rechazaba.
+- **Códigos RF fuera de la interfaz**: 16 apariciones en 6 pantallas.
+
+Y en la sesión siguiente:
+
+- **Cancelación de obra.** El formulario de edición incorpora el campo estado,
+  con `cancelada` como única opción manual y solo desde `en_ejecucion` o
+  `pausada`, restringido a los roles de gestión de obra. `ProyectoController` y
+  el simulador rechazan lo mismo: `422` si se intenta asignar a mano cualquier
+  otro estado, `409` si la obra no admite cancelarse. El alta ignora el estado
+  que reciba.
+- **Arreglo de la edición de obras.** El campo de fecha de inicio llevaba el
+  piso de hoy también al editar, así que el navegador daba por inválido el
+  formulario de cualquier obra ya empezada: no se podía guardar ningún cambio.
+  Ahora el piso aplica solo al alta, como en `ProyectoController::registrar()`.
+- **`EnRevision` y cierre por reporte final.** Un reporte marcado con `es_final`
+  cierra la obra: enviarlo la lleva a `en_revision` y aprobarlo la finaliza;
+  rechazarlo la devuelve a `en_ejecucion`. **El avance ya no finaliza la obra**:
+  llegar al 100 % es un dato, no una decisión. Se agregó `reporte.es_final` con
+  su migración. Al reactivar una obra pausada, vuelve a `en_revision` si hay un
+  reporte final esperando, sin necesidad de recordar el estado anterior.
+
 El TP4 está cerrado. La demo estática está publicada y verificada.
 
 ---
 
 ## 5. Pendientes
 
-**Del código**, ninguno bloqueante. En orden de valor:
+Ninguno bloqueante. En orden de valor:
 
-1. Convertir `proyecto.estado` en `ENUM`. Hoy es un `VARCHAR(30)` sin
-   restricción, así que admite cualquier valor.
-2. Pausar la obra al registrar un período de inactividad. El TP3 define esa
-   transición y `InactividadController` ya la implementa: registrar un período
-   vigente pausa la obra y cerrarlo la reactiva.
-3. Permitir cancelar una obra. Es el único estado terminal del TP3 que el sistema
-   no ofrece, y el formulario no incluye el campo estado.
-4. Incorporar `EnRevision` para el proyecto, ligado a la aprobación del reporte
-   final. Es el cambio más invasivo.
+1. **Decidir qué hacer con RF07 y RF16.** La documentación se guarda como enlace
+   (`documento.url`), no como archivo. Son dos requerimientos «Importante» sin
+   cumplir. Tres caminos: almacenamiento externo, BLOB en la base, o dejarlo así
+   y documentar la desviación con su fundamento en `DOCUMENTACION.md` —hoy solo
+   figura en la guía de testers, que la cátedra no lee—. Es una decisión de
+   grupo, no una tarea.
+2. **Completar RF26**: `incidencia.gravedad` clasifica, pero no dispara los
+   protocolos de notificación que pide el requerimiento. `Mailer` ya funciona.
+3. **Llevar la alerta de maquinaria a la pantalla de Alertas.** RF24 está
+   cumplido —`MaquinariaController` compara contra el promedio de cada máquina—
+   pero esa alerta no llega a `AnalisisController`, que solo emite las de avance
+   y material.
+4. **Distinguir `Creado` de `Planificado`.**
 
-**De la documentación**, las correcciones del docente que están en `REVISION-TPS.md`:
-el nombre del CU22, sus pre y poscondiciones, la transición `EnRevision → Pausado`
-en el ciclo de la obra, y el estado `Cancelado` en el ciclo del reporte.
+**De la documentación**: quedan **C1, C2 y C3**, que son ediciones sobre el PDF
+del TP2 (los actores del diagrama, y el nombre y las condiciones del CU22) y no
+se pueden hacer desde el repositorio. La redacción de reemplazo está propuesta
+en `REVISION-TPS.md`. C4 y C5 ya están aplicadas en `DOCUMENTACION.md`.
 
 **Deuda técnica** anotada en `DOCUMENTACION.md`: no hay pruebas automatizadas,
 `back-node/` duplica el backend, las migraciones están descritas por duplicado,
@@ -192,7 +259,36 @@ como función. Lo aplica `FRONT/scripts/demo-un-archivo.mjs`.
 
 **El antivirus borra los scripts PHP que se conectan a la base.** `migrar.php` y
 similares desaparecen del working tree. Están commiteados, así que conviene no
-hacer `git add -A` a ciegas.
+hacer `git add -A` a ciegas. Aplica también a
+`migracion-estado-enum.php`: si no aparece, `git checkout` sobre ese archivo.
+
+**`migrar.php` no aplica cambios de tipo de columna.** Solo ejecuta
+`schema.sql`, y todas sus tablas usan `CREATE TABLE IF NOT EXISTS`: sobre una
+base que ya existe es un no-op. Cambiar un tipo en `schema.sql` afecta
+únicamente a instalaciones nuevas. Para una base ya creada hace falta un script
+aparte con su `ALTER` — como `migracion-estado-enum.php`. Es la razón por la que
+el `ENUM` puede estar en el repo y no en Aiven al mismo tiempo.
+
+**El simulador se desincroniza del backend sin que nadie lo note.**
+`FRONT/src/app/mock/servidor.ts` reproduce el contrato de la API, pero es código
+aparte: si PHP valida algo y el mock no, la demo acepta datos que el sistema real
+rechaza, que es la peor combinación posible para un tester. Ya pasó con el rango
+de fechas y con las etapas. Al tocar una validación en PHP, tocá también el mock.
+
+**En el mock, las obras se identifican por `id`, no por `id_proyecto`.** El resto
+de las colecciones sí usa `id_proyecto`. Un `find` con la clave equivocada
+devuelve `undefined` en silencio y la función parece no hacer nada.
+
+**La clave de `localStorage` del mock lleva la huella de `datos.json`.**
+`localStorage` es por origen, no por versión del sitio: sin eso, republicar la
+demo dejaba a quien ya hubiera entrado viendo su copia vieja. Si cambiás la forma
+de los datos, el sufijo cambia solo y las copias viejas se descartan. No lo
+vuelvas a una constante fija.
+
+**El preview de Vercel de una rama mezcla frontend nuevo con backend viejo.**
+Compila el frontend de esa rama, pero apunta a la API de Render, que se despliega
+desde `main`. Una función que dependa de un endpoint nuevo va a fallar ahí hasta
+que el backend también esté desplegado.
 
 ---
 
@@ -214,7 +310,23 @@ php -S localhost:8000 -t back/public
 cd FRONT && npm run dev
 ```
 
-Un recorrido de humo sobre la demo estática: entrar con cada uno de los cuatro
-roles, comprobar que el Técnico no ve presupuesto y que no le aparece el menú de
-Usuarios, y recargar la página estando en `#/alertas` para confirmar que la ruta
-sobrevive. Las cuentas están en `FRONT/MODO-PRUEBA.md`.
+### Pruebas automatizadas del modo estático
+
+En `FRONT/scripts/pruebas/` hay cuatro guiones que manejan un navegador real
+contra el build estático. No son pruebas unitarias del backend —eso sigue siendo
+deuda pendiente— pero cubren de punta a punta lo que más se rompe. Cómo correrlos
+está en `FRONT/scripts/pruebas/README.md`.
+
+| Guion | Qué cubre |
+|---|---|
+| `humo.mjs` | los cuatro roles: login, RF19, RF20, las ocho pantallas y la recarga en `#/alertas` |
+| `inactividad.mjs` | pausar y reactivar la obra, con sus casos borde |
+| `validaciones.mjs` | rango de fechas invertido, en el navegador y en el simulador |
+| `persistencia.mjs` | la copia de `localStorage` y su invalidación |
+
+Si tocás el mock o el ciclo de estados, corrélos antes de pushear.
+
+El recorrido manual equivalente, por si preferís a mano: entrar con cada uno de
+los cuatro roles, comprobar que el Técnico no ve presupuesto y que no le aparece
+el menú de Usuarios, y recargar la página estando en `#/alertas` para confirmar
+que la ruta sobrevive. Las cuentas están en `FRONT/MODO-PRUEBA.md`.

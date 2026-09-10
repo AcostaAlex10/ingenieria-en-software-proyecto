@@ -4,6 +4,8 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Checkbox } from "./ui/checkbox";
+import { etiquetaEstado } from "../estadosObra";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
@@ -39,9 +41,9 @@ export default function ReportesPage() {
   const [filtro, setFiltro] = useState("");
 
   const [dialogNuevo, setDialogNuevo] = useState(false);
-  const [formNuevo, setFormNuevo] = useState({ id_proyecto: "", titulo: "", contenido: "" });
+  const [formNuevo, setFormNuevo] = useState({ id_proyecto: "", titulo: "", contenido: "", es_final: false });
   const [editando, setEditando] = useState<Reporte | null>(null);
-  const [formEdit, setFormEdit] = useState({ titulo: "", contenido: "" });
+  const [formEdit, setFormEdit] = useState({ titulo: "", contenido: "", es_final: false });
   const [rechazando, setRechazando] = useState<Reporte | null>(null);
   const [observacion, setObservacion] = useState("");
 
@@ -72,10 +74,11 @@ export default function ReportesPage() {
         id_proyecto: parseInt(formNuevo.id_proyecto, 10),
         titulo: formNuevo.titulo,
         contenido: formNuevo.contenido,
+        es_final: formNuevo.es_final,
       });
       toast.success("Reporte creado (borrador)");
       setDialogNuevo(false);
-      setFormNuevo({ id_proyecto: "", titulo: "", contenido: "" });
+      setFormNuevo({ id_proyecto: "", titulo: "", contenido: "", es_final: false });
       await cargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al crear el reporte");
@@ -95,10 +98,16 @@ export default function ReportesPage() {
     }
   }
 
+  // Enviar, aprobar o rechazar un reporte final mueve la obra. El backend
+  // devuelve `estado_proyecto` solo cuando eso pasó, y se avisa: el usuario
+  // actuó sobre un reporte y el efecto real está en otra pantalla.
   async function accion(fn: () => Promise<unknown>, ok: string) {
     try {
-      await fn();
+      const res = (await fn()) as { estado_proyecto?: string } | undefined;
       toast.success(ok);
+      if (res?.estado_proyecto) {
+        toast.info(`La obra quedó ${etiquetaEstado(res.estado_proyecto).toLowerCase()}`);
+      }
       await cargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error en la operación");
@@ -162,7 +171,10 @@ export default function ReportesPage() {
                       {r.proyecto} · por {r.autor} · {new Date(r.fecha_creacion).toLocaleDateString("es-AR")}
                     </CardDescription>
                   </div>
-                  <Badge style={{ background: est.color }}>{est.label}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.es_final && <Badge variant="outline">Reporte final</Badge>}
+                    <Badge style={{ background: est.color }}>{est.label}</Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -177,7 +189,7 @@ export default function ReportesPage() {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {cargaReportes && editable && (
                     <>
-                      <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditando(r); setFormEdit({ titulo: r.titulo, contenido: r.contenido }); }}>
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => { setEditando(r); setFormEdit({ titulo: r.titulo, contenido: r.contenido, es_final: r.es_final }); }}>
                         <Edit className="w-4 h-4" /> Editar
                       </Button>
                       <Button size="sm" className="gap-1" onClick={() => accion(() => enviarReporte(r.id_reporte), "Enviado a revisión")}>
@@ -232,6 +244,22 @@ export default function ReportesPage() {
               <Label htmlFor="rcont">Contenido</Label>
               <Textarea id="rcont" required value={formNuevo.contenido} onChange={(e) => setFormNuevo({ ...formNuevo, contenido: e.target.value })} placeholder="Detalle del reporte..." rows={5} />
             </div>
+            {/* El reporte final cierra la obra: al enviarlo pasa a revisión y
+                al aprobarse queda finalizada. Un parte diario común va sin
+                marcar y no toca el estado de la obra. */}
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <Checkbox
+                id="rfinal"
+                checked={formNuevo.es_final}
+                onCheckedChange={(v) => setFormNuevo({ ...formNuevo, es_final: v === true })}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="rfinal" className="cursor-pointer">Es el reporte final de la obra</Label>
+                <p className="text-xs text-muted-foreground">
+                  Al enviarlo, la obra pasa a revisión. Cuando el supervisor lo apruebe, queda finalizada.
+                </p>
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDialogNuevo(false)}>Cancelar</Button>
               <Button type="submit">Crear borrador</Button>
@@ -255,6 +283,19 @@ export default function ReportesPage() {
             <div className="space-y-2">
               <Label htmlFor="econt">Contenido</Label>
               <Textarea id="econt" required value={formEdit.contenido} onChange={(e) => setFormEdit({ ...formEdit, contenido: e.target.value })} rows={5} />
+            </div>
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <Checkbox
+                id="efinal"
+                checked={formEdit.es_final}
+                onCheckedChange={(v) => setFormEdit({ ...formEdit, es_final: v === true })}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="efinal" className="cursor-pointer">Es el reporte final de la obra</Label>
+                <p className="text-xs text-muted-foreground">
+                  Al enviarlo, la obra pasa a revisión. Cuando el supervisor lo apruebe, queda finalizada.
+                </p>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditando(null)}>Cancelar</Button>

@@ -1,0 +1,41 @@
+{
+  // Configuracion de TypeScript para el chequeo de tipos. Vite NO la usa para
+  // compilar: esbuild borra los tipos sin verificarlos, asi que hasta ahora
+  // nadie chequeaba estas 6.400 lineas. Esto existe para `npm run typecheck`.
+  //
+  // Arranca en `strict` y no en un nivel bajo con plan de subida, porque al
+  // medirlo el codigo ya pasaba `strict` con cero errores: no hay deuda que
+  // pagar de a poco. Lo que hay que evitar ahora es que entre deuda nueva, y
+  // para eso el chequeo tiene que correr en CI.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    // Solo verificar: quien compila es Vite.
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "strict": true,
+
+    // Estas dos quedan afuera a proposito: marcan variables e imports sin usar,
+    // que son ruido de estilo y no defectos. Si alguna vez se agrega un linter,
+    // es su trabajo, no el del chequeo de tipos.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "scripts"]
+}

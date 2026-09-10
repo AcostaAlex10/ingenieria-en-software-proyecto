@@ -7,7 +7,7 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Play, Layers, Wallet, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, User, Calendar, TrendingUp, Plus, Users, CloudRain, Trash2, Package, FileText, ExternalLink, AlertTriangle, Pause, Play, Layers, Wallet, Pencil, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   obtenerProyecto, obtenerPlanificacion, crearPlanificacion,
@@ -480,6 +480,40 @@ export default function ProyectoDetallePage() {
               <Play className="w-4 h-4" /> Continuar obra
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Obra en revisión: el reporte final está esperando al supervisor. */}
+      {proyecto.estado === "en_revision" && (
+        <div
+          className="rounded-lg border-2 px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+          style={{ borderColor: "#f59e0b", background: "rgba(245, 158, 11, 0.10)" }}
+          role="status"
+        >
+          <ClipboardCheck className="w-7 h-7 shrink-0" style={{ color: "#f59e0b" }} />
+          <div className="flex-1 min-w-[240px]">
+            <p className="font-semibold text-lg leading-tight" style={{ color: "#f59e0b" }}>Obra en revisión</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              El reporte final está enviado. La obra queda finalizada cuando el supervisor lo apruebe.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* La obra llegó al 100 % pero nadie mandó el reporte final. El avance ya
+          no la finaliza solo, así que sin este aviso quedaría en ejecución sin
+          que se entienda por qué. */}
+      {proyecto.estado === "en_ejecucion" && proyecto.avance >= 100 && (
+        <div
+          className="rounded-lg border px-5 py-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+          style={{ borderColor: "#3b82f6", background: "rgba(59, 130, 246, 0.08)" }}
+          role="status"
+        >
+          <ClipboardCheck className="w-6 h-6 shrink-0" style={{ color: "#3b82f6" }} />
+          <p className="text-sm flex-1 min-w-[240px]">
+            <span className="font-semibold">La obra alcanzó el 100 % de avance.</span>{" "}
+            Para cerrarla, cargá el reporte final desde Reportes y enviálo a revisión.
+          </p>
         </div>
       )}
 

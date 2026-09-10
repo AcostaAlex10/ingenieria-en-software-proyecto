@@ -122,10 +122,18 @@ export interface Reporte {
   titulo: string;
   contenido: string;
   estado: EstadoReporte;
+  /** Reporte de cierre de la obra: enviarlo la pone en revisión y aprobarlo la finaliza. */
+  es_final: boolean;
   observacion_revision: string | null;
   fecha_creacion: string;
   fecha_revision: string | null;
 }
+
+/**
+ * Respuesta de las acciones que además mueven la obra (enviar, aprobar,
+ * rechazar un reporte final). `estado_proyecto` solo viene si la obra cambió.
+ */
+export type ReporteConObra = Reporte & { estado_proyecto?: string };
 export interface PeriodoInactividad {
   id_periodo: number;
   id_proyecto: number;
@@ -310,19 +318,19 @@ export async function listarReportes(estado?: string): Promise<Reporte[]> {
   const q = estado ? `?estado=${encodeURIComponent(estado)}` : "";
   return parse(await apiFetch(`/reportes${q}`));
 }
-export async function crearReporte(datos: { id_proyecto: number; titulo: string; contenido: string }): Promise<Reporte> {
+export async function crearReporte(datos: { id_proyecto: number; titulo: string; contenido: string; es_final?: boolean }): Promise<Reporte> {
   return parse(await apiFetch(`/reportes`, { method: "POST", body: JSON.stringify(datos) }));
 }
-export async function editarReporte(id: number, datos: { titulo: string; contenido: string }): Promise<Reporte> {
+export async function editarReporte(id: number, datos: { titulo: string; contenido: string; es_final?: boolean }): Promise<Reporte> {
   return parse(await apiFetch(`/reportes/${id}`, { method: "PUT", body: JSON.stringify(datos) }));
 }
-export async function enviarReporte(id: number): Promise<Reporte> {
+export async function enviarReporte(id: number): Promise<ReporteConObra> {
   return parse(await apiFetch(`/reportes/${id}/enviar`, { method: "POST" }));
 }
-export async function aprobarReporte(id: number, observacion?: string): Promise<Reporte> {
+export async function aprobarReporte(id: number, observacion?: string): Promise<ReporteConObra> {
   return parse(await apiFetch(`/reportes/${id}/aprobar`, { method: "POST", body: JSON.stringify({ observacion }) }));
 }
-export async function rechazarReporte(id: number, observacion: string): Promise<Reporte> {
+export async function rechazarReporte(id: number, observacion: string): Promise<ReporteConObra> {
   return parse(await apiFetch(`/reportes/${id}/rechazar`, { method: "POST", body: JSON.stringify({ observacion }) }));
 }
 export async function eliminarReporte(id: number): Promise<void> {

@@ -199,6 +199,11 @@ CREATE TABLE IF NOT EXISTS reporte (
   titulo               VARCHAR(150) NOT NULL,
   contenido            TEXT NOT NULL,
   estado               ENUM('borrador','en_revision','aprobado','rechazado') NOT NULL DEFAULT 'borrador',
+  -- Marca el reporte de cierre de la obra. Enviarlo lleva la obra a
+  -- 'en_revision' y aprobarlo la finaliza: es la certificacion del TP3, la
+  -- unica via por la que una obra queda terminada. Un parte diario comun
+  -- lleva 0 y no mueve el estado de la obra.
+  es_final             TINYINT(1) NOT NULL DEFAULT 0,
   observacion_revision VARCHAR(500) NULL,
   fecha_creacion       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   fecha_revision       DATETIME NULL,

@@ -20,6 +20,21 @@ export const ESTADOS_OBRA: Record<string, EstadoObra> = {
   cancelada: { label: "Cancelada", color: "#78716c" },
 };
 
+// Cancelar es el único cambio de estado que hace una persona a mano. El resto
+// los mueve el sistema: `AvanceController` con los avances físicos e
+// `InactividadController` con los períodos de parada. Por eso el formulario de
+// obra ofrece `cancelada` y nada más.
+//
+// El TP3 traza la cancelación desde EnEjecucion y desde Pausado, no desde una
+// obra que todavía no arrancó ni desde una terminada. `ProyectoController`
+// valida lo mismo del lado del servidor; si cambiás esto, cambialo allá.
+export const ESTADOS_CANCELABLES = ["en_ejecucion", "pausada"];
+
+/** Si una obra en este estado puede cancelarse (TP3: decisión gerencial). */
+export function sePuedeCancelar(estado: string): boolean {
+  return ESTADOS_CANCELABLES.includes(estado);
+}
+
 /** Etiqueta legible de un estado. Si llega uno desconocido, se muestra crudo
  *  en vez de inventar otro: es preferible que se note a que engañe. */
 export function etiquetaEstado(estado: string): string {

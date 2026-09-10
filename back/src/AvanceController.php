@@ -69,6 +69,11 @@ final class AvanceController
             return;
         }
 
+        if ($this->obraCancelada($planId)) {
+            $this->json(409, ['error' => 'No se puede registrar avance en una obra cancelada']);
+            return;
+        }
+
         $errores = $this->validar($datos);
         if (!empty($errores)) {
             $this->json(422, ['errors' => $errores]);
@@ -124,6 +129,11 @@ final class AvanceController
             return;
         }
 
+        if ($this->obraCancelada((string) $actual['id_planificacion'])) {
+            $this->json(409, ['error' => 'No se puede registrar avance en una obra cancelada']);
+            return;
+        }
+
         $errores = $this->validar($datos, true);
         if (!empty($errores)) {
             $this->json(422, ['errors' => $errores]);
@@ -172,11 +182,43 @@ final class AvanceController
      * Transicion automatica del estado de la OBRA segun los avances cargados
      * en su planificacion (RF: ciclo de vida del proyecto):
      *   - primer avance (> 0%) estando en 'planificacion' -> 'en_ejecucion'
-     *   - el avance llega a 100% -> 'finalizada'
-     * Una obra 'pausada' o ya 'finalizada' no se reactiva sola (decision manual).
+     *
+     * El avance NO finaliza la obra. Llegar al 100 % es un dato, no una
+     * decision: la obra se cierra cuando el supervisor aprueba el reporte
+     * final, como establece el TP3 y hace ReporteController. Antes esta
+     * funcion la pasaba a 'finalizada' al tocar el 100 %, y como esa regla no
+     * miraba el estado previo, tambien terminaba una obra pausada o cancelada.
+     *
+     * Ninguna otra transicion sale de aca: 'pausada' la maneja
+     * InactividadController, y 'cancelada' el formulario de obra.
+     *
      * Ademas refleja el avance real (mayor porcentaje cargado) en proyecto.avance,
      * que es lo que muestran el dashboard y el listado.
      */
+    /**
+     * Si la obra de esa planificacion esta cancelada.
+     *
+     * Una obra cancelada se dio por terminada sin completarse: seguir
+     * cargandole avance hace subir su porcentaje en el dashboard y en el
+     * listado, como si avanzara. InactividadController ya se protege por otro
+     * lado ('cancelada' no esta en EN_MARCHA); esto es el control equivalente.
+     *
+     * Mira solo 'cancelada'. Que una obra 'finalizada' tampoco deba recibir
+     * avance es razonable, pero es una decision aparte y todavia no esta
+     * tomada.
+     */
+    private function obraCancelada(string $planId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.estado
+               FROM planificacion pl
+               JOIN proyecto p ON p.id_proyecto = pl.id_proyecto
+              WHERE pl.id_planificacion = ?'
+        );
+        $stmt->execute([$planId]);
+        return $stmt->fetchColumn() === 'cancelada';
+    }
+
     private function sincronizarProyecto(string $planId): void
     {
         $stmt = $this->db->prepare(
@@ -198,9 +240,7 @@ final class AvanceController
         $avanceReal = (float) $stmt->fetchColumn();
 
         $estado = $proyecto['estado'];
-        if ($avanceReal >= 100) {
-            $estado = 'finalizada';
-        } elseif ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
+        if ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
             $estado = 'en_ejecucion';
         }
 

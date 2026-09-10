@@ -14,9 +14,9 @@ import {
   type Proyecto, type ProyectoInput,
 } from "../api/proyectos";
 import { puedeGestionarObras, puedeVerCostos } from "../auth/permisos";
-import { etiquetaEstado } from "../estadosObra";
+import { etiquetaEstado, sePuedeCancelar } from "../estadosObra";
 
-const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "" };
+const FORM_VACIO = { nombre: "", tipo: "", ubicacion: "", encargado: "", fechaInicio: "", presupuesto: "", estado: "" };
 
 // Fecha de hoy (YYYY-MM-DD) en la zona horaria LOCAL del usuario (no UTC),
 // para no permitir fechas de inicio en el pasado.
@@ -53,6 +53,13 @@ export default function ProyectosPage() {
   const gestiona = puedeGestionarObras();
   const verCostos = puedeVerCostos();
 
+  // Estado con el que se abrio la edicion, para saber si la obra admite
+  // cancelarse sin que la opcion desaparezca al elegirla.
+  const estadoOriginal = editandoId
+    ? proyectos.find((p) => p.id === editandoId)?.estado ?? ""
+    : "";
+  const puedeCancelar = sePuedeCancelar(estadoOriginal);
+
   async function cargar() {
     setLoading(true);
     try {
@@ -76,6 +83,7 @@ export default function ProyectosPage() {
     { v: "planificacion", l: "Planificación" },
     { v: "pausada", l: "Pausadas" },
     { v: "finalizada", l: "Finalizadas" },
+    { v: "cancelada", l: "Canceladas" },
   ];
 
   function abrirNuevo() {
@@ -88,6 +96,7 @@ export default function ProyectosPage() {
     setForm({
       nombre: p.nombre, tipo: p.tipo, ubicacion: p.ubicacion,
       encargado: p.encargado, fechaInicio: p.fechaInicio, presupuesto: String(p.presupuesto),
+      estado: p.estado,
     });
     setDialogAbierto(true);
   }
@@ -101,8 +110,11 @@ export default function ProyectosPage() {
     };
     try {
       if (editandoId) {
-        await actualizarProyecto(editandoId, datos);
-        toast.success("Proyecto actualizado");
+        // El estado solo viaja al editar: en el alta lo fija el backend en
+        // 'planificacion'. Cancelar es el unico valor que el formulario ofrece.
+        const cancelada = form.estado === "cancelada";
+        await actualizarProyecto(editandoId, { ...datos, estado: form.estado });
+        toast.success(cancelada ? "Obra cancelada" : "Proyecto actualizado");
       } else {
         await crearProyecto(datos);
         toast.success("Proyecto registrado con éxito");
@@ -264,12 +276,41 @@ export default function ProyectosPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fecha">Fecha de Inicio *</Label>
-                <Input id="fecha" type="date" min={HOY} value={form.fechaInicio} onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })} required />
+                {/* El piso de hoy es solo para el alta, igual que en
+                    ProyectoController::registrar(). Al editar una obra que ya
+                    empezó su fecha es pasada, y con el min puesto el navegador
+                    daba el formulario por inválido: no se podía guardar ningún
+                    cambio sobre una obra en marcha. */}
+                <Input id="fecha" type="date" min={editandoId ? undefined : HOY} value={form.fechaInicio} onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })} required />
               </div>
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="presupuesto">Presupuesto Estimado (ARS) *</Label>
                 <Input id="presupuesto" type="number" value={form.presupuesto} onChange={(e) => setForm({ ...form, presupuesto: e.target.value })} placeholder="0.00" min="0" step="0.01" required />
               </div>
+              {/* Estado: solo al editar, y solo para cancelar. El estado original
+                  sale del listado, asi las opciones no cambian si el usuario
+                  elige "Cancelada" y despues se arrepiente. */}
+              {editandoId && (
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="estado">Estado</Label>
+                  <Select
+                    value={form.estado}
+                    onValueChange={(v) => setForm({ ...form, estado: v })}
+                    disabled={!puedeCancelar}
+                  >
+                    <SelectTrigger id="estado"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={estadoOriginal}>{etiquetaEstado(estadoOriginal)}</SelectItem>
+                      {puedeCancelar && <SelectItem value="cancelada">Cancelada</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {puedeCancelar
+                      ? "Cancelar da la obra por terminada sin completarla. No se puede deshacer desde acá."
+                      : "Los demás estados los mueve el sistema con los avances y las paradas de obra."}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setDialogAbierto(false)}>Cancelar</Button>

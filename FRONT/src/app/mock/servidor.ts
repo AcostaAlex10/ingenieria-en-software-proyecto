@@ -11,6 +11,7 @@
  * la autorizacion real del servidor. Es un doble de prueba de la interfaz.
  */
 import base from "./datos.json";
+import { ESTADOS_CANCELABLES } from "../estadosObra";
 
 /**
  * Hash FNV-1a de 32 bits, en base 36. No es criptografico: solo sirve para
@@ -249,8 +250,9 @@ function sincronizarProyecto(idPlan: number): void {
     .filter((a) => Number(a.id_planificacion) === idPlan)
     .reduce((max, a) => Math.max(max, num(a.porcentaje_avance)), 0);
   proyecto.avance = real;
+  // El avance NO finaliza la obra: la cierra el supervisor al aprobar el
+  // reporte final, igual que en AvanceController::sincronizarProyecto().
   if (proyecto.estado === "planificacion" && real > 0) proyecto.estado = "en_ejecucion";
-  if (real >= 100 && proyecto.estado === "en_ejecucion") proyecto.estado = "finalizada";
 }
 
 function analisis(rol: string) {
@@ -389,9 +391,64 @@ function reporteCompleto(r: Fila) {
     ...r,
     id_reporte: Number(r.id_reporte),
     id_proyecto: Number(r.id_proyecto),
+    // Los reportes que ya estaban en datos.json no traen el campo: un reporte
+    // que se cargo antes de que existiera la marca no es el de cierre.
+    es_final: Boolean(r.es_final),
     proyecto: String(proyecto?.nombre ?? "Obra eliminada"),
     autor: String(autor?.nombre ?? "Usuario"),
   };
+}
+
+// --- cierre de obra por reporte final -------------------------------------
+// Mismas reglas que ReporteController: enviar el reporte final lleva la obra a
+// `en_revision`, aprobarlo la finaliza y rechazarlo la devuelve a
+// `en_ejecucion`. En el mock las obras se buscan por `id`, no por `id_proyecto`.
+
+/** Estado actual de la obra, o null si no existe. */
+function estadoObra(idProyecto: string): string | null {
+  const obra = db.proyectos.find((p) => String(p.id) === String(idProyecto));
+  return obra ? texto(obra.estado) : null;
+}
+
+/** Mueve la obra y devuelve el estado nuevo, para que el front lo refleje. */
+function moverObra(idProyecto: string, estado: string): string {
+  const obra = db.proyectos.find((p) => String(p.id) === String(idProyecto));
+  if (obra) obra.estado = estado;
+  return estado;
+}
+
+/** Si la obra ya tiene otro reporte final ocupando el cierre. */
+function hayOtroFinalVigente(idProyecto: string, idExcluido: number): boolean {
+  return db.reportes.some(
+    (r) =>
+      String(r.id_proyecto) === String(idProyecto) &&
+      Boolean(r.es_final) &&
+      Number(r.id_reporte) !== idExcluido &&
+      ["en_revision", "aprobado"].includes(texto(r.estado))
+  );
+}
+
+/** Si la obra de esa planificacion esta cancelada (AvanceController::obraCancelada). */
+function obraCanceladaDePlan(idPlan: number): boolean {
+  const plan = db.planificaciones.find((p) => Number(p.id_planificacion) === idPlan);
+  if (!plan) return false;
+  const obra = db.proyectos.find((p) => String(p.id) === String(plan.id_proyecto));
+  return obra ? texto(obra.estado) === "cancelada" : false;
+}
+
+/** Si la obra tiene un reporte final esperando la revision del supervisor. */
+function tieneFinalEnRevision(idProyecto: number): boolean {
+  return db.reportes.some(
+    (r) =>
+      Number(r.id_proyecto) === idProyecto &&
+      Boolean(r.es_final) &&
+      texto(r.estado) === "en_revision"
+  );
+}
+
+/** Agrega `estado_proyecto` a la respuesta solo si la obra se movio. */
+function conEstadoProyecto(cuerpo: object, estado: string | null): object {
+  return estado === null ? cuerpo : { ...cuerpo, estado_proyecto: estado };
 }
 
 /** RF20: el PersonalTecnico no ve el presupuesto de la obra. */
@@ -451,8 +508,11 @@ function sincronizarPorInactividad(idProyecto: number): string | null {
   ).length;
   let nuevo: string;
   if (vigentes > 0 && EN_MARCHA.includes(texto(obra.estado))) nuevo = "pausada";
-  else if (vigentes === 0 && texto(obra.estado) === "pausada") nuevo = "en_ejecucion";
-  else return null;
+  else if (vigentes === 0 && texto(obra.estado) === "pausada") {
+    // Igual que InactividadController: si hay un reporte final esperando
+    // revision, la obra estaba cerrandose y vuelve a `en_revision`.
+    nuevo = tieneFinalEnRevision(idProyecto) ? "en_revision" : "en_ejecucion";
+  } else return null;
   obra.estado = nuevo;
   guardar();
   return nuevo;
@@ -614,6 +674,7 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
         titulo: texto(cuerpo.titulo),
         contenido: texto(cuerpo.contenido),
         estado: "borrador",
+        es_final: Boolean(cuerpo.es_final),
         observacion_revision: null,
         fecha_creacion: hoy(),
         fecha_revision: null,
@@ -634,12 +695,19 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       }
       r.titulo = texto(cuerpo.titulo) || r.titulo;
       r.contenido = texto(cuerpo.contenido) || r.contenido;
+      if (cuerpo.es_final !== undefined) r.es_final = Boolean(cuerpo.es_final);
       guardar();
       return ok(reporteCompleto(r));
     }
     if (metodo === "DELETE" && s.length === 2) {
       const veto = exige(ROLES_DOC);
       if (veto) return veto;
+      // Igual que ReporteController::eliminar(): borrar el reporte final
+      // mientras esta en revision dejaba la obra trabada en `en_revision`,
+      // sin ninguna transicion que la sacara de ahi.
+      if (r.estado !== "borrador" && r.estado !== "rechazado") {
+        return json(409, { error: "Solo se puede eliminar un reporte en borrador o rechazado" });
+      }
       return eliminarDe(db.reportes, "id_reporte", num(s[1]));
     }
     if (metodo === "POST" && s[2] === "enviar") {
@@ -648,9 +716,22 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (r.estado !== "borrador" && r.estado !== "rechazado") {
         return json(409, { error: "El reporte ya fue enviado" });
       }
+      // Mismos controles que ReporteController::enviar().
+      const idObraEnvio = String(r.id_proyecto);
+      if (r.es_final) {
+        if (hayOtroFinalVigente(idObraEnvio, Number(r.id_reporte))) {
+          return json(409, { error: "La obra ya tiene un reporte final en revisión o aprobado" });
+        }
+        if (estadoObra(idObraEnvio) !== "en_ejecucion") {
+          return json(409, {
+            error: "Solo se puede enviar el reporte final de una obra en ejecución",
+          });
+        }
+      }
       r.estado = "en_revision";
+      const estadoTrasEnviar = r.es_final ? moverObra(idObraEnvio, "en_revision") : null;
       guardar();
-      return ok(reporteCompleto(r));
+      return ok(conEstadoProyecto(reporteCompleto(r), estadoTrasEnviar));
     }
     if (metodo === "POST" && (s[2] === "aprobar" || s[2] === "rechazar")) {
       const veto = exige(ROLES_REPORTE_APROBAR);
@@ -658,11 +739,29 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (r.estado !== "en_revision") {
         return json(409, { error: "Solo se puede revisar un reporte en revision" });
       }
+      // Igual que ReporteController::rechazar(): sin motivo no hay rechazo.
+      // Va antes de tocar el estado, porque si no la demo aceptaba un rechazo
+      // vacio que la API real corta con 422.
+      if (s[2] === "rechazar" && texto(cuerpo.observacion).trim() === "") {
+        return json(422, { errors: { observacion: "Indicá el motivo del rechazo" } });
+      }
       r.estado = s[2] === "aprobar" ? "aprobado" : "rechazado";
       r.observacion_revision = texto(cuerpo.observacion) || null;
       r.fecha_revision = hoy();
+      // Solo se mueve una obra que este en revision: si mientras tanto la
+      // pausaron o la cancelaron, se la deja donde esta.
+      let estadoTrasResolver: string | null = null;
+      if (r.es_final) {
+        const idObraResol = String(r.id_proyecto);
+        if (estadoObra(idObraResol) === "en_revision") {
+          estadoTrasResolver = moverObra(
+            idObraResol,
+            s[2] === "aprobar" ? "finalizada" : "en_ejecucion"
+          );
+        }
+      }
       guardar();
-      return ok(reporteCompleto(r));
+      return ok(conEstadoProyecto(reporteCompleto(r), estadoTrasResolver));
     }
     return noEncontrado();
   }
@@ -831,6 +930,13 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (metodo === "POST") {
         const veto = exige(ROLES_AVANCE);
         if (veto) return veto;
+        // Igual que AvanceController::crear(): una obra cancelada se dio por
+        // terminada, cargarle avance le hace subir el porcentaje en el
+        // dashboard. El mock no tiene edicion de avance, asi que el control
+        // solo hace falta aca.
+        if (obraCanceladaDePlan(idPlan)) {
+          return json(409, { error: "No se puede registrar avance en una obra cancelada" });
+        }
         const nuevo: Fila = {
           id_avance: proximoId(db.avances, "id_avance"),
           id_planificacion: idPlan,
@@ -958,7 +1064,9 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
         ubicacion: texto(cuerpo.ubicacion),
         encargado: texto(cuerpo.encargado),
         fechaInicio: texto(cuerpo.fechaInicio),
-        estado: texto(cuerpo.estado) || "planificacion",
+        // Toda obra nueva arranca en 'planificacion', igual que en PHP: si el
+        // alta aceptara un estado, se saltearia la regla de transicion.
+        estado: "planificacion",
         avance: num(cuerpo.avance),
         presupuesto: num(cuerpo.presupuesto),
       };
@@ -976,8 +1084,34 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       const veto = exige(ROLES_GESTION_OBRA);
       if (veto) return veto;
       if (metodo === "PUT") {
+        // Mismo control que ProyectoController::modificar(): cancelar es el
+        // unico cambio de estado manual, y solo desde una obra en marcha. Si
+        // el estado que llega es el que ya tiene, no hay nada que revisar.
+        if (cuerpo.estado !== undefined) {
+          const estadoNuevo = texto(cuerpo.estado);
+          if (estadoNuevo !== "" && estadoNuevo !== texto(obra.estado)) {
+            if (estadoNuevo !== "cancelada") {
+              return json(422, {
+                errors: {
+                  estado:
+                    'El unico estado que se asigna a mano es "cancelada"; el resto los mueve el sistema',
+                },
+              });
+            }
+            if (!ESTADOS_CANCELABLES.includes(texto(obra.estado))) {
+              return json(409, {
+                error: "Solo se puede cancelar una obra en ejecucion o pausada",
+              });
+            }
+          }
+        }
         for (const campo of ["nombre", "tipo", "ubicacion", "encargado", "fechaInicio", "estado"]) {
-          if (cuerpo[campo] !== undefined) obra[campo] = texto(cuerpo[campo]);
+          if (cuerpo[campo] === undefined) continue;
+          // Un estado vacio no es un cambio y no puede escribirse: dejaria la
+          // obra fuera de la maquina de estados. En PHP el mismo caso llegaba
+          // a un ENUM. Ver ProyectoController::modificar().
+          if (campo === "estado" && texto(cuerpo[campo]).trim() === "") continue;
+          obra[campo] = texto(cuerpo[campo]);
         }
         if (cuerpo.presupuesto !== undefined) obra.presupuesto = num(cuerpo.presupuesto);
         if (cuerpo.avance !== undefined) obra.avance = num(cuerpo.avance);
@@ -1194,4 +1328,17 @@ if (typeof window !== "undefined") {
     reiniciar();
     window.location.reload();
   };
+
+  // Costura de prueba: varias reglas del contrato (borrar un reporte enviado,
+  // rechazar sin motivo, cargar avance en una obra cancelada) viven en la capa
+  // de API y no hay forma de llegar a ellas desde la interfaz. Las suites de
+  // `scripts/pruebas/` las ejercitan por aca.
+  //
+  // Nunca se ejecuta en produccion. Vite emite este archivo como un chunk
+  // aparte (`assets/servidor-*.js`) en todos los builds, pero el `import()`
+  // que lo carga esta detras de VITE_MOCK === "1" en auth/api.ts: sin esa
+  // variable el chunk queda en dist sin que nadie lo pida, y este bloque no
+  // corre. La costura no agrega superficie: si el modulo se cargara, el
+  // simulador entero ya estaria activo.
+  (window as unknown as { sgsoMockFetch: typeof mockFetch }).sgsoMockFetch = mockFetch;
 }
