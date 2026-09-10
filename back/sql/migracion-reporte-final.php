@@ -16,10 +16,21 @@ declare(strict_types=1);
  * No modifica ningun reporte existente. Todos quedan con es_final = 0, que es
  * lo correcto: ninguno se cargo con la intencion de cerrar una obra.
  *
- * Uso:
+ * Uso, con las credenciales en back/.env (copiado de back/.env.example):
+ *   php back/sql/migracion-reporte-final.php
+ *
+ * Tambien sirven las variables de entorno, y tienen prioridad sobre back/.env:
  *   DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD=... DB_SSL=true \
  *     php back/sql/migracion-reporte-final.php
  */
+
+// Credenciales: primero back/.env, despues el entorno real. Env::cargar NO pisa
+// variables ya definidas, asi que en Render y en CI sigue mandando el entorno.
+// Sin esto habia que exportar cinco variables a mano en la misma consola, y
+// olvidarse de una hacia que el script cayera en los valores por defecto
+// (127.0.0.1 / root) y fallara con un error de conexion enganoso.
+require_once __DIR__ . '/../src/Env.php';
+Env::cargar(__DIR__ . '/../.env');
 
 $host = getenv('DB_HOST') ?: '127.0.0.1';
 $port = getenv('DB_PORT') ?: '3306';
@@ -33,7 +44,27 @@ if (getenv('DB_SSL') === 'true') {
     $opciones[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
 }
 
-$pdo = new PDO($dsn, $user, $pass, $opciones);
+try {
+    $pdo = new PDO($dsn, $user, $pass, $opciones);
+} catch (PDOException $e) {
+    // Un PDOException crudo no dice por que fallo. El caso tipico es que no se
+    // encontraron las credenciales y el script cayo en los valores por defecto,
+    // que es lo que hace ruido: el mensaje habla de 127.0.0.1 y de 'root' aunque
+    // la base real este en Aiven.
+    fwrite(STDERR, "No pude conectar a {$host}:{$port} como '{$user}'." . PHP_EOL);
+    if ($host === '127.0.0.1' && $user === 'root') {
+        fwrite(STDERR, <<<TXT
+        Esos son los valores por defecto: no se encontraron las credenciales.
+        Opciones:
+          1. Copia back/.env.example a back/.env y completalo (recomendado).
+          2. O defini DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD y DB_SSL
+             en la MISMA consola desde la que corres este script.
+
+        TXT);
+    }
+    fwrite(STDERR, 'Detalle: ' . $e->getMessage() . PHP_EOL);
+    exit(1);
+}
 
 // 1. La tabla tiene que existir.
 $stmt = $pdo->prepare(
