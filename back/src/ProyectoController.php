@@ -142,6 +142,15 @@ final class ProyectoController
         if (array_key_exists('estado', $datos)) {
             $estadoNuevo = trim((string) $datos['estado']);
 
+            // Un estado vacio no es un cambio, pero tampoco puede llegar al
+            // repositorio: alli se resuelve con `$datos['estado'] ?? $actual`,
+            // y `??` no cae al valor actual con una cadena vacia. Escribiria
+            // '' en la columna, que ahora es un ENUM: error de MySQL en modo
+            // estricto, o una obra fuera de la maquina de estados sin el.
+            if ($estadoNuevo === '') {
+                unset($datos['estado']);
+            }
+
             if ($estadoNuevo !== '' && $estadoNuevo !== $actual['estado']) {
                 if ($estadoNuevo !== self::ESTADO_MANUAL) {
                     $this->responderJson(422, ['errors' => [

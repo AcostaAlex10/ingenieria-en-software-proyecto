@@ -69,6 +69,11 @@ final class AvanceController
             return;
         }
 
+        if ($this->obraCancelada($planId)) {
+            $this->json(409, ['error' => 'No se puede registrar avance en una obra cancelada']);
+            return;
+        }
+
         $errores = $this->validar($datos);
         if (!empty($errores)) {
             $this->json(422, ['errors' => $errores]);
@@ -121,6 +126,11 @@ final class AvanceController
         $actual = $stmt->fetch();
         if ($actual === false) {
             $this->json(404, ['error' => 'Registro de avance no encontrado']);
+            return;
+        }
+
+        if ($this->obraCancelada((string) $actual['id_planificacion'])) {
+            $this->json(409, ['error' => 'No se puede registrar avance en una obra cancelada']);
             return;
         }
 
@@ -185,6 +195,30 @@ final class AvanceController
      * Ademas refleja el avance real (mayor porcentaje cargado) en proyecto.avance,
      * que es lo que muestran el dashboard y el listado.
      */
+    /**
+     * Si la obra de esa planificacion esta cancelada.
+     *
+     * Una obra cancelada se dio por terminada sin completarse: seguir
+     * cargandole avance hace subir su porcentaje en el dashboard y en el
+     * listado, como si avanzara. InactividadController ya se protege por otro
+     * lado ('cancelada' no esta en EN_MARCHA); esto es el control equivalente.
+     *
+     * Mira solo 'cancelada'. Que una obra 'finalizada' tampoco deba recibir
+     * avance es razonable, pero es una decision aparte y todavia no esta
+     * tomada.
+     */
+    private function obraCancelada(string $planId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.estado
+               FROM planificacion pl
+               JOIN proyecto p ON p.id_proyecto = pl.id_proyecto
+              WHERE pl.id_planificacion = ?'
+        );
+        $stmt->execute([$planId]);
+        return $stmt->fetchColumn() === 'cancelada';
+    }
+
     private function sincronizarProyecto(string $planId): void
     {
         $stmt = $this->db->prepare(

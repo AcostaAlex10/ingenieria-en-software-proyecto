@@ -11,6 +11,14 @@ simulador, que es donde vive la mayor parte del comportamiento por rol.
 | `inactividad.mjs` | pausar y reactivar la obra: período vigente, período histórico que no pausa, obra finalizada que no revive, eliminar el vigente |
 | `validaciones.mjs` | rango de fechas invertido, en las dos barreras: el `min` del navegador y la validación del simulador |
 | `persistencia.mjs` | la copia en `localStorage` y su invalidación al cambiar `datos.json` |
+| `contrato.mjs` | reglas que no tienen botón: borrar un reporte ya enviado, rechazar sin motivo, mandar un estado vacío, cargar avance en una obra cancelada |
+
+`contrato.mjs` es distinto de los otros cuatro: en vez de manejar la pantalla,
+le habla al simulador directo por `window.sgsoMockFetch`, la costura que expone
+`src/app/mock/servidor.ts`. Existe porque esas cuatro reglas viven en la capa de
+API y no hay forma de llegar a ellas desde la interfaz. Las cuatro cubren
+defectos reales que estuvieron en el código; si alguna vuelve, esta suite se
+pone en rojo.
 
 ## Cómo correrlos
 
@@ -43,6 +51,7 @@ node scripts/pruebas/humo.mjs
 node scripts/pruebas/inactividad.mjs
 node scripts/pruebas/validaciones.mjs
 node scripts/pruebas/persistencia.mjs
+node scripts/pruebas/contrato.mjs
 ```
 
 Cada uno imprime una línea por comprobación y termina con el total. Sale con

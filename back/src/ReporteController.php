@@ -172,12 +172,26 @@ final class ReporteController
         $this->resolver($id, 'rechazado', $obs);
     }
 
-    /** DELETE /api/reportes/{id} */
+    /**
+     * DELETE /api/reportes/{id}  -> solo en borrador o rechazado.
+     *
+     * La restriccion es la misma que en editar() y enviar(), y aca ademas es
+     * lo que evita que la obra quede trabada: borrar el reporte final mientras
+     * esta 'en_revision' dejaba la obra en ese estado sin nadie que la sacara.
+     * enviar() otro final exige la obra 'en_ejecucion', resolver() exige un
+     * reporte en revision que ya no existe, y modificar() de obra solo admite
+     * cancelar desde 'en_ejecucion' o 'pausada'. No quedaba ninguna salida.
+     */
     public function eliminar(string $id): void
     {
-        $stmt = $this->db->prepare('DELETE FROM reporte WHERE id_reporte = ?');
-        $stmt->execute([$id]);
-        if ($stmt->rowCount() === 0) { $this->json(404, ['error' => 'Reporte no encontrado']); return; }
+        $actual = $this->buscar($id);
+        if ($actual === null) { $this->json(404, ['error' => 'Reporte no encontrado']); return; }
+        if (!in_array($actual['estado'], ['borrador', 'rechazado'], true)) {
+            $this->json(409, ['error' => 'Solo se puede eliminar un reporte en borrador o rechazado']);
+            return;
+        }
+
+        $this->db->prepare('DELETE FROM reporte WHERE id_reporte = ?')->execute([$id]);
         $this->json(200, ['mensaje' => 'Reporte eliminado']);
     }
 

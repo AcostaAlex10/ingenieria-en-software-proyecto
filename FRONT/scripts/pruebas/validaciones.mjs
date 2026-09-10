@@ -54,7 +54,7 @@ chequear('con el min puesto, el navegador marca el campo inválido',
 // ---- 2. El simulador también, si alguien esquiva el navegador (segunda barrera) ----
 const antes = await contar('inactividades', 1);
 await page.evaluate(() => document.getElementById('if').removeAttribute('min'));
-await escribir('ii', '2026-09-09');
+await escribir('ii', hoy);
 await escribir('if', '2025-09-11');
 await escribir('im', 'Prueba: fin antes del inicio');
 await page.click('button:has-text("Registrar período")');
@@ -71,7 +71,7 @@ if (await page.locator('#eff').count()) {
     (await page.locator('#eff').getAttribute('min')) !== null);
   const etapasAntes = await contar('etapas', null);
   await page.evaluate(() => document.getElementById('eff').removeAttribute('min'));
-  await escribir('efi', '2026-09-09');
+  await escribir('efi', hoy);
   await escribir('eff', '2025-01-01');
   const nom = page.locator('input[placeholder*="Cimientos" i]').first();
   if (await nom.count()) await nom.fill('Etapa con fechas al revés');

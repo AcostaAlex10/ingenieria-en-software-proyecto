@@ -428,6 +428,14 @@ function hayOtroFinalVigente(idProyecto: string, idExcluido: number): boolean {
   );
 }
 
+/** Si la obra de esa planificacion esta cancelada (AvanceController::obraCancelada). */
+function obraCanceladaDePlan(idPlan: number): boolean {
+  const plan = db.planificaciones.find((p) => Number(p.id_planificacion) === idPlan);
+  if (!plan) return false;
+  const obra = db.proyectos.find((p) => String(p.id) === String(plan.id_proyecto));
+  return obra ? texto(obra.estado) === "cancelada" : false;
+}
+
 /** Si la obra tiene un reporte final esperando la revision del supervisor. */
 function tieneFinalEnRevision(idProyecto: number): boolean {
   return db.reportes.some(
@@ -694,6 +702,12 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
     if (metodo === "DELETE" && s.length === 2) {
       const veto = exige(ROLES_DOC);
       if (veto) return veto;
+      // Igual que ReporteController::eliminar(): borrar el reporte final
+      // mientras esta en revision dejaba la obra trabada en `en_revision`,
+      // sin ninguna transicion que la sacara de ahi.
+      if (r.estado !== "borrador" && r.estado !== "rechazado") {
+        return json(409, { error: "Solo se puede eliminar un reporte en borrador o rechazado" });
+      }
       return eliminarDe(db.reportes, "id_reporte", num(s[1]));
     }
     if (metodo === "POST" && s[2] === "enviar") {
@@ -724,6 +738,12 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (veto) return veto;
       if (r.estado !== "en_revision") {
         return json(409, { error: "Solo se puede revisar un reporte en revision" });
+      }
+      // Igual que ReporteController::rechazar(): sin motivo no hay rechazo.
+      // Va antes de tocar el estado, porque si no la demo aceptaba un rechazo
+      // vacio que la API real corta con 422.
+      if (s[2] === "rechazar" && texto(cuerpo.observacion).trim() === "") {
+        return json(422, { errors: { observacion: "Indicá el motivo del rechazo" } });
       }
       r.estado = s[2] === "aprobar" ? "aprobado" : "rechazado";
       r.observacion_revision = texto(cuerpo.observacion) || null;
@@ -910,6 +930,13 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
       if (metodo === "POST") {
         const veto = exige(ROLES_AVANCE);
         if (veto) return veto;
+        // Igual que AvanceController::crear(): una obra cancelada se dio por
+        // terminada, cargarle avance le hace subir el porcentaje en el
+        // dashboard. El mock no tiene edicion de avance, asi que el control
+        // solo hace falta aca.
+        if (obraCanceladaDePlan(idPlan)) {
+          return json(409, { error: "No se puede registrar avance en una obra cancelada" });
+        }
         const nuevo: Fila = {
           id_avance: proximoId(db.avances, "id_avance"),
           id_planificacion: idPlan,
@@ -1079,7 +1106,12 @@ async function despachar(ruta: string, opciones: RequestInit): Promise<Response>
           }
         }
         for (const campo of ["nombre", "tipo", "ubicacion", "encargado", "fechaInicio", "estado"]) {
-          if (cuerpo[campo] !== undefined) obra[campo] = texto(cuerpo[campo]);
+          if (cuerpo[campo] === undefined) continue;
+          // Un estado vacio no es un cambio y no puede escribirse: dejaria la
+          // obra fuera de la maquina de estados. En PHP el mismo caso llegaba
+          // a un ENUM. Ver ProyectoController::modificar().
+          if (campo === "estado" && texto(cuerpo[campo]).trim() === "") continue;
+          obra[campo] = texto(cuerpo[campo]);
         }
         if (cuerpo.presupuesto !== undefined) obra.presupuesto = num(cuerpo.presupuesto);
         if (cuerpo.avance !== undefined) obra.avance = num(cuerpo.avance);
@@ -1296,4 +1328,17 @@ if (typeof window !== "undefined") {
     reiniciar();
     window.location.reload();
   };
+
+  // Costura de prueba: varias reglas del contrato (borrar un reporte enviado,
+  // rechazar sin motivo, cargar avance en una obra cancelada) viven en la capa
+  // de API y no hay forma de llegar a ellas desde la interfaz. Las suites de
+  // `scripts/pruebas/` las ejercitan por aca.
+  //
+  // Nunca se ejecuta en produccion. Vite emite este archivo como un chunk
+  // aparte (`assets/servidor-*.js`) en todos los builds, pero el `import()`
+  // que lo carga esta detras de VITE_MOCK === "1" en auth/api.ts: sin esa
+  // variable el chunk queda en dist sin que nadie lo pida, y este bloque no
+  // corre. La costura no agrega superficie: si el modulo se cargara, el
+  // simulador entero ya estaria activo.
+  (window as unknown as { sgsoMockFetch: typeof mockFetch }).sgsoMockFetch = mockFetch;
 }
