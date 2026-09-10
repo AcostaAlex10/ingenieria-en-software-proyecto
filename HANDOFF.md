@@ -12,29 +12,29 @@ ya nos topamos.
 
 **Repositorio:** `AcostaAlex10/ingenieria-en-software-proyecto` — público.
 
-> ### ⚠ Lo primero: hay dos migraciones sin correr
+> ### Las dos migraciones de esquema ya están corridas
 >
-> Los cambios de esquema no alteran una base que ya existe: `migrar.php` solo
-> ejecuta `schema.sql`, y todas sus tablas usan `CREATE TABLE IF NOT EXISTS`.
-> Hay que correr los dos scripts una vez, contra Aiven:
+> Verificado contra Aiven el 9 de septiembre de 2026: `proyecto.estado` es un
+> ENUM con los siete valores (incluidos `en_revision` y `cancelada`) y existe
+> `reporte.es_final TINYINT(1)`. No hay nada pendiente que correr.
+>
+> Queda anotado porque es la trampa que nos costó un intento: los cambios de
+> esquema no alteran una base que ya existe. `migrar.php` solo ejecuta
+> `schema.sql`, y todas sus tablas usan `CREATE TABLE IF NOT EXISTS`. Agregar
+> una columna ahí no tiene ningún efecto sobre una base viva, por eso cada
+> cambio de esquema necesita su propio script en `back/sql/`.
+>
+> Si alguna vez hay que correr uno, las credenciales salen de `back/.env`
+> (copiado de `back/.env.example`); ya no hace falta exportar variables a mano:
 >
 > ```powershell
-> $env:DB_HOST="…"; $env:DB_PORT="…"; $env:DB_NAME="…"
-> $env:DB_USER="…"; $env:DB_PASSWORD="…"; $env:DB_SSL="true"
 > php back/sql/migracion-estado-enum.php
 > php back/sql/migracion-reporte-final.php
 > ```
 >
-> Los cinco valores están en Render → el servicio del backend → Environment.
-> Los dos scripts son idempotentes y no tocan ningún dato existente.
->
-> | Script | Qué hace | Si no se corre |
-> |---|---|---|
-> | `migracion-estado-enum.php` | `proyecto.estado` de `VARCHAR` a `ENUM` | Sin urgencia: el sistema funciona, falta la restricción que impide guardar un estado inválido |
-> | `migracion-reporte-final.php` | agrega `reporte.es_final` | **Bloqueante en producción**: sin esa columna, todo el módulo de reportes falla. El cierre de obra depende de ella |
->
-> El segundo es el que importa: hasta que se corra, la API desplegada va a
-> romper al listar o crear reportes. La demo estática no se ve afectada.
+> Los dos son idempotentes: si el cambio ya está, avisan y salen sin tocar nada.
+> Los valores para `back/.env` están en Render, en el servicio del backend,
+> sección Environment.
 
 **Rama de trabajo: `main`.** Ahí va todo el desarrollo, y ahí despliegan Vercel
 y Render.
@@ -169,10 +169,7 @@ El TP4 está cerrado. La demo estática está publicada y verificada.
 
 ## 5. Pendientes
 
-**Operación**, y va primero: correr `back/sql/migracion-estado-enum.php` contra
-Aiven, como explica el aviso de la sección 1.
-
-**Del código**, ninguno bloqueante. En orden de valor:
+Ninguno bloqueante. En orden de valor:
 
 1. **Decidir qué hacer con RF07 y RF16.** La documentación se guarda como enlace
    (`documento.url`), no como archivo. Son dos requerimientos «Importante» sin
