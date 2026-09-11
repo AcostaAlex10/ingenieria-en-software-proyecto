@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Sgso\Env;
+
 /**
  * Ejecuta back/sql/schema.sql contra la base configurada por variables de
  * entorno (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_SSL).
@@ -18,7 +22,6 @@ declare(strict_types=1);
 // Sin esto habia que exportar cinco variables a mano en la misma consola, y
 // olvidarse de una hacia que el script cayera en los valores por defecto
 // (127.0.0.1 / root) y fallara con un error de conexion enganoso.
-require_once __DIR__ . '/../src/Env.php';
 Env::cargar(__DIR__ . '/../.env');
 
 $host = getenv('DB_HOST') ?: '127.0.0.1';

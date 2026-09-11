@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Controlador de Asistencia del personal en obra (RF06). Cada registro es
  * la asistencia de un trabajador, en una obra (proyecto) y una fecha dadas.

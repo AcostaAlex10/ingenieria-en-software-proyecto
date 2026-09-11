@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Gestion de usuarios (HU16, completa RF19). Solo el AdministradorSistema.
  *

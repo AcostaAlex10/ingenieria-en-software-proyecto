@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Sgso\Database;
+use Sgso\Env;
+
 /**
  * Seed: crea el usuario administrador de prueba (con contrasena hasheada)
  * y carga los proyectos de ejemplo en MariaDB si la tabla esta vacia.
  *
  * Uso (desde la carpeta back):  php sql/seed.php
  */
-require_once __DIR__ . '/../src/Env.php';
-require_once __DIR__ . '/../src/Database.php';
 
 Env::cargar(__DIR__ . '/../.env');
 

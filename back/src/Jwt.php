@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Implementacion minima de JSON Web Token (JWT) con algoritmo HS256.
  * Hecha a mano para no depender de Composer (igual que el resto del

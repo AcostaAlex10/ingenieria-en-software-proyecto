@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Cargador minimo de variables de entorno desde un archivo .env
  * (KEY=VALUE por linea). PHP no lee .env solo, asi que esto suple a

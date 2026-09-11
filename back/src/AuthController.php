@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/Jwt.php';
-require_once __DIR__ . '/Mailer.php';
+namespace Sgso;
+
+use PDO;
+
 
 /**
  * Controlador de autenticacion (login). Equivalente PHP del backend de

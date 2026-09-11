@@ -156,7 +156,8 @@ proyectos), HU02 (planificación inicial), HU04 (avance físico), HU12/HU13
 
 **Decisión técnica clave.** Por requerimiento de la cátedra, backend en PHP sobre
 MariaDB. Implicó unificar en un solo backend lo que distintos integrantes habían
-prototipado por separado. `back-node/` es el resto de esa etapa: no se despliega.
+prototipado por separado. Esa etapa dejó además una API alternativa en Node
+(`back-node/`), borrada del árbol de trabajo al aceptarse ADR-001.
 
 **Stack.** PHP 8.3 sin framework con PDO; MariaDB/MySQL; React 18 + Vite +
 TypeScript con Tailwind y shadcn/ui, gráficos con Recharts; bcrypt y JWT. Docker

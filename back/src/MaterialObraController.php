@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Materiales asignados a una obra y sus consumos (RF10). Calcula el total
  * consumido vs. lo asignado para detectar excesos (RF12).

@@ -106,11 +106,10 @@ back/             API REST en PHP 8 sin framework — este es el backend
   src/                  un controlador por recurso
   sql/                  schema.sql (17 tablas), migrar.php, seed.php
                         migracion-*.php (cambios de esquema, uno por cambio)
-back-node/        API equivalente en Node — NO se despliega, no tocar
 ```
 
-**El backend del proyecto es `back/` (PHP).** La cátedra lo exige. `back-node/`
-quedó como alternativa histórica.
+**El backend del proyecto es `back/` (PHP).** La cátedra lo exige. La alternativa
+en Node (`back-node/`) se borró del árbol al aceptarse ADR-001; queda en git.
 
 Todas las peticiones del frontend pasan por `transporte()` en
 `FRONT/src/app/auth/api.ts`, que elige entre la API real y el simulador según
@@ -190,8 +189,7 @@ del TP2 (los actores del diagrama, y el nombre y las condiciones del CU22) y no
 se pueden hacer desde el repositorio. La redacción de reemplazo está propuesta
 en `REVISION-TPS.md`. C4 y C5 ya están aplicadas en `DOCUMENTACION.md`.
 
-**Deuda técnica** anotada en `DOCUMENTACION.md`: no hay pruebas automatizadas,
-`back-node/` duplica el backend, las migraciones están descritas por duplicado,
+**Deuda técnica** anotada en `DOCUMENTACION.md`: no hay pruebas de backend,
 `proyecto.encargado` es texto libre en vez de una referencia a `usuario`, y
 `proyecto.avance` se guarda plano en lugar de calcularse desde `avance_fisico`.
 

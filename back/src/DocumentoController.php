@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Documentacion de la obra (RF16). Se guarda el dato del documento y un
  * enlace (Drive/URL), no el binario. Decision de diseno acordada por el

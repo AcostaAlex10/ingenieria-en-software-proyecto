@@ -17,12 +17,11 @@ la trazabilidad con los trabajos prácticos están en **[DOCUMENTACION.md](DOCUM
 | Frontend (SPA) | `FRONT/` | React 18 + Vite 6 + TypeScript, Tailwind v4, shadcn/ui | Desplegado en Vercel |
 | Backend (API REST) | `back/` | **PHP 8** sin framework, PDO | Desplegado en Render (Docker) |
 | Base de datos | `back/sql/` | MariaDB / MySQL | Desplegada en Aiven |
-| Backend alternativo | `back-node/` | Node.js + Express + TypeScript | **No desplegado** |
 
 > **Cuál es el backend del proyecto:** el de `back/` (PHP). La cátedra exige PHP sobre
-> MariaDB, y es el que está desplegado y conectado al frontend. `back-node/` es una
-> implementación equivalente en Node que quedó como alternativa histórica: no se
-> despliega y no debe usarse para la entrega. Si tocás endpoints, tocá `back/`.
+> MariaDB, y es el que está desplegado y conectado al frontend. Hubo una
+> implementación alternativa en Node (`back-node/`), borrada del árbol de trabajo al
+> aceptarse [ADR-001](docs/adr/ADR-001-stack.md); sigue disponible en el historial de git.
 
 ---
 
@@ -46,6 +45,7 @@ Alternativa desde PHP, útil para apuntar a la base remota: `php back/sql/migrar
 ### 2) Backend PHP
 
 ```bash
+cd back && composer install && cd ..   # genera vendor/autoload.php (sin esto no arranca)
 cp back/.env.example back/.env
 php back/sql/seed.php
 php -S localhost:8000 -t back/public
@@ -116,7 +116,6 @@ back/           API REST en PHP — backend del proyecto
   public/       front controller (index.php) y .htaccess
   src/          controladores, middleware de auth, acceso a datos
   sql/          schema.sql, migrar.php, migracion-estado-enum.php, seed.php
-back-node/      API equivalente en Node/Express (no desplegada)
 Intalar/        instalador de Node y comandos de ayuda para el equipo
 ```
 

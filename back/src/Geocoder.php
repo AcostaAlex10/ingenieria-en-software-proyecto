@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Verifica que una ubicacion (texto) corresponda a un lugar real, usando el
  * servicio gratuito de geocodificacion de OpenStreetMap (Nominatim).

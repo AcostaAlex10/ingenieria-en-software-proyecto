@@ -18,6 +18,13 @@ RUN a2enmod rewrite \
 # Copiar el codigo del backend (el contexto de build es la carpeta back/).
 COPY . /var/www/html/
 
+# Autoload PSR-4 (ADR-001 §5.1). El backend no tiene dependencias de produccion,
+# asi que esto NO descarga nada: solo genera vendor/autoload.php, que es lo que
+# index.php requiere. Sin este paso la API arranca con "class not found".
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www/html
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
 # Render (y otros) inyectan el puerto en la variable $PORT. Apache debe
 # escuchar en ese puerto. Lo ajustamos al arrancar.
 RUN printf '#!/bin/sh\nset -e\nP="${PORT:-80}"\nsed -ri "s/^Listen .*/Listen ${P}/" /etc/apache2/ports.conf\nsed -ri "s/<VirtualHost \\*:[0-9]+>/<VirtualHost *:${P}>/" /etc/apache2/sites-available/000-default.conf\nexec apache2-foreground\n' > /usr/local/bin/start.sh \

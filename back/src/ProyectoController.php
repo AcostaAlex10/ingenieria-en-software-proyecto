@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/ProyectoRepositoryInterface.php';
-require_once __DIR__ . '/Geocoder.php';
+namespace Sgso;
+
 
 /**
  * Controlador de Proyectos. No sabe nada de JSON-en-archivo ni de

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Headers CORS. El frontend (Vercel, o Vite en local) y la API viven en
  * origenes distintos, asi que el navegador exige estos headers.

@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Controlador de Incidencias externas de obra (RF09): clima, fallas de
  * maquinaria, retrasos de proveedores, etc. La `gravedad` clasifica la

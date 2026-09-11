@@ -20,7 +20,7 @@ Medido sobre el código el 2026-09-11, en `main` @ `6643888`:
 
 | # | Tarea (ADR §5) | Estado |
 |---|---|---|
-| 1 | `composer.json` con autoload PSR-4, mover `back/src/` a namespaces | pendiente |
+| 1 | `composer.json` con autoload PSR-4, mover `back/src/` a namespaces | **hecho** (Fase 1) |
 | 2 | PHPUnit sobre ciclo de vida, permisos por rol y cierre por reporte final | pendiente |
 | 3 | PHPStan en nivel medio | pendiente |
 | 4 | Reemplazar el ruteo de 29 ramas de `index.php` | pendiente |
@@ -37,7 +37,11 @@ lenguaje, es que no hay red de seguridad").
 
 No son código. Bloquean parte de lo que sigue, así que van primero.
 
-### D1. Qué hacer con `back-node/` — **requiere tu OK**
+### D1. Qué hacer con `back-node/` — **resuelto el 2026-09-11: borrado**
+
+> Alex aprobó borrarlo. La carpeta salió del árbol de trabajo en esta rama; el
+> código sigue en el historial de git (último commit que la tocó: `424972c`).
+> Los documentos que la mencionaban quedaron actualizados.
 
 El ADR lo dice explícitamente en "Qué NO decide este ADR": la recomendación es
 archivarlo o borrarlo, pero necesita tu aprobación.

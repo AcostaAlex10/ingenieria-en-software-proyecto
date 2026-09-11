@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/Jwt.php';
+namespace Sgso;
+
 
 /**
  * Lee el token del header "Authorization: Bearer <token>" y lo valida.

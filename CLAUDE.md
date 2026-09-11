@@ -17,12 +17,12 @@ course assignments, and `README.md` for setup instructions.
 | SPA | `FRONT/` | React 18 + Vite 6 + TypeScript | Vercel |
 | REST API | `back/` | PHP 8, no framework, PDO | Render (Docker, PHP + Apache) |
 | Database | `back/sql/` | MariaDB / MySQL | Aiven |
-| Alternative API | `back-node/` | Node.js + Express + TypeScript | **Not deployed** |
 
 > **Which backend to edit:** always `back/` (PHP). The course requires PHP over
-> MariaDB and that is what is deployed and consumed by the frontend. `back-node/`
-> is a historical alternative kept for reference — do not add features there and
-> do not treat it as the source of truth for the schema.
+> MariaDB and that is what is deployed and consumed by the frontend. A Node
+> alternative used to live in `back-node/`; it was deleted from the working tree
+> when ADR-001 was accepted (`docs/adr/ADR-001-stack.md`) and only exists in git
+> history.
 
 ### User roles
 - **AdministradorSistema** — superuser; manages accounts and role assignment
@@ -44,12 +44,15 @@ npm run build                    # production build
 
 ### Backend (`back/`)
 ```bash
+cd back && composer install      # required: generates vendor/autoload.php
 php back/sql/migrar.php          # apply schema.sql to the configured database
 php back/sql/seed.php            # create the initial admin user (bcrypt hash)
 php -S localhost:8000 -t back/public
 ```
 
-> There are no test or lint scripts configured anywhere in the repo.
+> The frontend has `npm run typecheck`. Backend tests (PHPUnit) and static
+> analysis (PHPStan) are declared in `back/composer.json` but not written yet —
+> they are phases 2 and 3 of `docs/adr/PLAN-ADR-001.md`.
 
 ## Architecture
 
@@ -88,6 +91,10 @@ Single front controller: `back/public/index.php` parses the path (everything und
 
 Cross-cutting pieces: `Env` (dotenv loader), `Cors`, `Database` (PDO singleton),
 `Jwt`, `AuthMiddleware`, `Mailer` (Brevo, for password recovery), `Geocoder`.
+
+Every class in `back/src/` lives under the `Sgso\` namespace and is loaded by
+Composer's PSR-4 autoloader — no manual `require_once`. Inside that namespace the
+global classes need importing, so files using `PDO` or `DateTime` carry a `use`.
 
 The timezone is pinned to `America/Argentina/Buenos_Aires` because Render runs in
 UTC and date validations depend on the local date.
