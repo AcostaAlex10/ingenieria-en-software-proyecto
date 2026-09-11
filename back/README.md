@@ -53,12 +53,13 @@ back/
   composer.json   <- autoload PSR-4 (Sgso\ -> src/) y herramientas de desarrollo
   composer.lock   <- versiones fijadas; se commitea
   public/
-    index.php     <- único punto de entrada: parsea la ruta, valida el token y delega
+    index.php     <- arranque, mapa de manejadores, token y guarda de rol
     .htaccess     <- reescritura para Apache
   phpunit.xml     <- configuración de PHPUnit
   phpstan.neon    <- nivel 5 sobre src, public y tests
   tests/          <- pruebas, namespace Sgso\Tests\
   src/            <- namespace Sgso\
+    Ruteo/                              <- tabla de rutas y despachador (dato + resolución pura)
     Reglas/                             <- reglas puras y probadas (CicloDeVida, Permisos)
     Env.php, Cors.php, Database.php     <- configuración, CORS y conexión PDO
     Jwt.php, AuthMiddleware.php         <- emisión y validación de tokens

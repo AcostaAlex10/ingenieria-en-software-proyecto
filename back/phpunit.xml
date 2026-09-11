@@ -7,13 +7,14 @@
          failOnRisky="true"
          cacheDirectory=".phpunit.cache">
     <testsuites>
-        <testsuite name="reglas">
-            <directory>tests/Reglas</directory>
+        <testsuite name="unidad">
+            <directory>tests</directory>
         </testsuite>
     </testsuites>
     <source>
         <include>
             <directory suffix=".php">src/Reglas</directory>
+            <directory suffix=".php">src/Ruteo</directory>
         </include>
     </source>
 </phpunit>

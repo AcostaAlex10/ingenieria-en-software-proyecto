@@ -88,8 +88,13 @@ the `Root` layout (sidebar + header) and requires an authenticated session:
 | `/usuarios` | `UsuariosPage` | Account and role management |
 
 ### Backend (`back/`)
-Single front controller: `back/public/index.php` parses the path (everything under
-`/api`), validates the JWT and dispatches to a controller in `back/src/`. Resources:
+Single front controller: `back/public/index.php`. Routing is a declarative
+table — `Sgso\Ruteo\Tabla` holds every route as data (method, path pattern,
+role guard, handler key) and `Sgso\Ruteo\Despachador` resolves a request
+against it. `index.php` keeps a `key => closure` map, the only place that knows
+the controllers, and applies the JWT check and the role guard the route
+declares. Add an endpoint in both places; `TablaTest` fails if a route has no
+handler. Resources:
 `auth`, `health`, `proyectos`, `planificacion`, `materiales`, `maquinaria`,
 `reportes`, `analisis`, `usuarios`.
 
