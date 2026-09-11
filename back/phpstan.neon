@@ -1,0 +1,10 @@
+# ADR-001 seccion 5.3: nivel medio, subiendo de a poco. Lo que no se hace es
+# bajar el nivel hasta que de verde; para lo viejo esta el baseline.
+parameters:
+    level: 5
+    paths:
+        - src
+        - public
+        - tests
+    bootstrapFiles:
+        - vendor/autoload.php

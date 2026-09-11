@@ -63,7 +63,7 @@ final class AnalisisController
                  WHERE pl.id_planificacion IN ($placeholders)
                  GROUP BY pl.id_proyecto"
             );
-            $stmtPB->execute(array_values($planIds));
+            $stmtPB->execute($planIds);
             foreach ($stmtPB->fetchAll() as $row) {
                 $presupuestoBasePorProyecto[(int) $row['id_proyecto']] = (float) $row['presupuesto_base_total'];
             }

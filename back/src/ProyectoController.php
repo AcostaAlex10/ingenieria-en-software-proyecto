@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Sgso;
 
+use Sgso\Reglas\CicloDeVida;
+
 
 /**
  * Controlador de Proyectos. No sabe nada de JSON-en-archivo ni de
@@ -29,14 +31,7 @@ final class ProyectoController
      * estado por PUT dejaria a la obra en un valor que el proximo recalculo
      * pisa, o peor, en uno incoherente con sus datos.
      */
-    private const ESTADO_MANUAL = 'cancelada';
-
-    /**
-     * El TP3 traza la cancelacion desde EnEjecucion y desde Pausado. Una obra
-     * que todavia no arranco se elimina, no se cancela; y una terminada ya es
-     * un estado final. El frontend valida lo mismo en estadosObra.ts.
-     */
-    private const ESTADOS_CANCELABLES = ['en_ejecucion', 'pausada'];
+    private const ESTADO_MANUAL = CicloDeVida::CANCELADA;
 
     public function __construct(private ProyectoRepositoryInterface $repositorio)
     {
@@ -159,7 +154,7 @@ final class ProyectoController
                     return;
                 }
 
-                if (!in_array($actual['estado'], self::ESTADOS_CANCELABLES, true)) {
+                if (!CicloDeVida::puedeCancelar((string) $actual['estado'])) {
                     $this->responderJson(409, [
                         'error' => 'Solo se puede cancelar una obra en ejecucion o pausada',
                     ]);

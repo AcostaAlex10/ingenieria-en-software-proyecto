@@ -30,8 +30,10 @@ course assignments, and `README.md` for setup instructions.
 - **PersonalTecnico** (Encargado de Obra) — registers daily advance, attendance, material consumption, machinery usage and incidents from the field
 - **Gerente** — read-only: monitors advance, consults comparative reports
 
-Role groups are declared as constants at the top of `back/public/index.php`
-(`ROLES_GESTION_OBRA`, `ROLES_AVANCE`, `ROLES_DOC`, `ROLES_REPORTE_APROBAR`, `ROLES_ADMIN`).
+Role groups live in `Sgso\Reglas\Permisos` (`GESTION_OBRA`, `AVANCE`, `DOC`,
+`REPORTE_APROBAR`, `ADMIN`). `back/public/index.php` re-exposes them as the
+`ROLES_*` constants its routing uses, but the list itself is defined — and
+tested — in that class.
 
 ## Commands
 
@@ -48,11 +50,13 @@ cd back && composer install      # required: generates vendor/autoload.php
 php back/sql/migrar.php          # apply schema.sql to the configured database
 php back/sql/seed.php            # create the initial admin user (bcrypt hash)
 php -S localhost:8000 -t back/public
+cd back && composer test         # PHPUnit over back/tests/
+cd back && composer phpstan      # PHPStan, level 5, must stay at zero errors
 ```
 
-> The frontend has `npm run typecheck`. Backend tests (PHPUnit) and static
-> analysis (PHPStan) are declared in `back/composer.json` but not written yet —
-> they are phases 2 and 3 of `docs/adr/PLAN-ADR-001.md`.
+> Checks that must stay green: `npm run typecheck` (front), `composer test` and
+> `composer phpstan` (back). Integration tests against MariaDB are phase 2b of
+> `docs/adr/PLAN-ADR-001.md` and do not exist yet.
 
 ## Architecture
 
@@ -95,6 +99,11 @@ Cross-cutting pieces: `Env` (dotenv loader), `Cors`, `Database` (PDO singleton),
 Every class in `back/src/` lives under the `Sgso\` namespace and is loaded by
 Composer's PSR-4 autoloader — no manual `require_once`. Inside that namespace the
 global classes need importing, so files using `PDO` or `DateTime` carry a `use`.
+
+Business rules that controllers used to decide inline now live in `Sgso\Reglas`:
+`CicloDeVida` (the seven project states and which transition is legal) and
+`Permisos` (the RF19 role groups). Both are pure — no PDO, no output — and are
+the only backend code with tests. Change a state rule there, not in a controller.
 
 The timezone is pinned to `America/Argentina/Buenos_Aires` because Render runs in
 UTC and date validations depend on the local date.

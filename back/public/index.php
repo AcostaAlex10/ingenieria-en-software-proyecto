@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use Sgso\Reglas\Permisos;
 use Sgso\AnalisisController;
 use Sgso\AsistenciaController;
 use Sgso\AuthController;
@@ -55,12 +56,13 @@ header('Content-Type: application/json; charset=utf-8');
 $jwtSecreto = Env::get('JWT_SECRET', 'cambiar_esta_clave');
 $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 
-// Grupos de roles autorizados (RF19). El AdministradorSistema es superusuario.
-const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra, planificacion y materiales
-const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar avance, asistencia, incidencias y consumos
-const ROLES_DOC = ['AdministradorSistema', 'PersonalAdministrativo', 'PersonalTecnico']; // cargar documentacion, reportes, inactividad y excedentes (todos menos Gerente)
-const ROLES_REPORTE_APROBAR = ['AdministradorSistema', 'PersonalAdministrativo'];        // aprobar/rechazar reportes (RF21)
-const ROLES_ADMIN = ['AdministradorSistema'];                                            // gestionar cuentas y roles (HU16)
+// Grupos de roles autorizados (RF19). La lista vive en Sgso\Reglas\Permisos,
+// que es donde se prueba; aca solo se le ponen los nombres que usan las rutas.
+const ROLES_GESTION_OBRA = Permisos::GESTION_OBRA;       // crear/editar/eliminar obra, planificacion y materiales
+const ROLES_AVANCE = Permisos::AVANCE;                   // registrar avance, asistencia, incidencias y consumos
+const ROLES_DOC = Permisos::DOC;                         // documentacion, reportes, inactividad y excedentes (todos menos Gerente)
+const ROLES_REPORTE_APROBAR = Permisos::REPORTE_APROBAR; // aprobar/rechazar reportes (RF21)
+const ROLES_ADMIN = Permisos::ADMIN;                     // gestionar cuentas y roles (HU16)
 
 $db = Database::conexion();
 
@@ -497,7 +499,9 @@ if ($recurso === 'proyectos') {
 
     switch (true) {
         case $metodoHttp === 'GET' && $id === null:    $controlador->listar($_GET['q'] ?? null, $usuario['rol'] ?? null); break;
-        case $metodoHttp === 'GET' && $id !== null:    $controlador->mostrar($id, $usuario['rol'] ?? null); break;
+        // Sin `$id !== null`: si se llego aca con GET, el case anterior ya
+        // descarto el listado, asi que hay id si o si.
+        case $metodoHttp === 'GET':                   $controlador->mostrar($id, $usuario['rol'] ?? null); break;
         case $metodoHttp === 'POST' && $id === null:   exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->registrar(leerCuerpoJson()); break;
         case $metodoHttp === 'PUT' && $id !== null:    exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->modificar($id, leerCuerpoJson()); break;
         case $metodoHttp === 'DELETE' && $id !== null: exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->eliminar($id); break;
@@ -543,7 +547,7 @@ function exigirAutenticacion(string $secreto): array
  */
 function exigirRol(array $usuario, array $rolesPermitidos): void
 {
-    if (!in_array($usuario['rol'] ?? '', $rolesPermitidos, true)) {
+    if (!Permisos::puede(isset($usuario['rol']) ? (string) $usuario['rol'] : null, $rolesPermitidos)) {
         responder(403, ['error' => 'No tenés permisos para esta acción']);
         exit;
     }

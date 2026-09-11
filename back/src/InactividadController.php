@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sgso;
 
 use PDO;
+use Sgso\Reglas\CicloDeVida;
 
 /**
  * Periodos de inactividad de la obra con su motivo (RF25). Sirven para
@@ -15,9 +16,6 @@ use PDO;
  */
 final class InactividadController
 {
-    /** Estados desde los que una obra puede pasar a `pausada`. */
-    private const EN_MARCHA = ['en_ejecucion', 'en_revision'];
-
     public function __construct(private PDO $db)
     {
     }
@@ -163,14 +161,14 @@ final class InactividadController
         $stmt->execute([$idProyecto, $hoy, $hoy]);
         $vigentes = (int) $stmt->fetchColumn();
 
-        if ($vigentes > 0 && in_array($estado, self::EN_MARCHA, true)) {
-            $nuevo = 'pausada';
-        } elseif ($vigentes === 0 && $estado === 'pausada') {
+        if (CicloDeVida::debePausar((string) $estado, $vigentes)) {
+            $nuevo = CicloDeVida::PAUSADA;
+        } elseif (CicloDeVida::debeReactivar((string) $estado, $vigentes)) {
             // A donde vuelve depende de si la obra estaba cerrandose. No hace
             // falta recordar el estado anterior en una columna: si hay un
             // reporte final esperando revision, la obra estaba en
             // `en_revision` y ahi vuelve; si no, a `en_ejecucion`.
-            $nuevo = $this->tieneFinalEnRevision($idProyecto) ? 'en_revision' : 'en_ejecucion';
+            $nuevo = CicloDeVida::destinoAlReactivar($this->tieneFinalEnRevision($idProyecto));
         } else {
             return null;
         }

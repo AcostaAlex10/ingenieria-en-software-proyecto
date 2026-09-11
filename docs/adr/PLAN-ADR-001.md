@@ -21,8 +21,8 @@ Medido sobre el código el 2026-09-11, en `main` @ `6643888`:
 | # | Tarea (ADR §5) | Estado |
 |---|---|---|
 | 1 | `composer.json` con autoload PSR-4, mover `back/src/` a namespaces | **hecho** (Fase 1) |
-| 2 | PHPUnit sobre ciclo de vida, permisos por rol y cierre por reporte final | pendiente |
-| 3 | PHPStan en nivel medio | pendiente |
+| 2 | PHPUnit sobre ciclo de vida, permisos por rol y cierre por reporte final | **2a hecha**; falta 2b (integración) |
+| 3 | PHPStan en nivel medio | **hecho** (nivel 5, 0 errores) |
 | 4 | Reemplazar el ruteo de 29 ramas de `index.php` | pendiente |
 | 5 | CI en GitHub Actions | pendiente |
 | 6 | `typescript` en el front y script `typecheck` | **hecho** (`366d379`) |
@@ -118,6 +118,13 @@ Por eso se parte en dos, y la primera mitad es la que tiene casi todo el valor.
 
 ### 2a. Extraer las reglas puras y probarlas sin base
 
+> **Hecho.** Quedaron `Sgso\Reglas\CicloDeVida` y `Sgso\Reglas\Permisos`, con
+> 115 pruebas en verde. Los cuatro controladores que decidían el estado por su
+> cuenta ahora delegan, y las constantes `ROLES_*` de `index.php` salen de
+> `Permisos`. Una prueba contrasta los estados contra
+> `FRONT/src/app/estadosObra.ts`: la próxima desincronización con el front sale
+> en rojo en vez de aparecer en la demo.
+
 - `Sgso\Reglas\CicloDeVida` — la máquina de estados de los siete estados del TP3:
   qué transición es legal desde dónde. Hoy está repartida entre
   `InactividadController::sincronizarEstado()`, `ProyectoController` (cancelación)
@@ -149,6 +156,11 @@ cubiertas.
 ---
 
 ## Fase 3 — PHPStan (ADR §5.3)
+
+> **Hecho, y sin baseline.** El nivel 5 encontró solo tres redundancias — dos en
+> código de producción y una en una prueba propia — y se arreglaron. El pozo era
+> chico, así que el nivel queda en 5 y `phpstan.neon` cubre `src`, `public` y
+> `tests`.
 
 `phpstan.neon` apuntando a `back/src` y `back/public`.
 
