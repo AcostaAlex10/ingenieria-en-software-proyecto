@@ -1,5 +1,7 @@
 # SGSO — Sistema de Gestión y Seguimiento Operativo de Obras
 
+[![CI](https://github.com/AcostaAlex10/ingenieria-en-software-proyecto/actions/workflows/ci.yml/badge.svg)](https://github.com/AcostaAlex10/ingenieria-en-software-proyecto/actions/workflows/ci.yml)
+
 Aplicación web para que una empresa constructora centralice la gestión de sus obras:
 proyectos, planificación, avance físico, materiales, maquinaria, documentación,
 reportes y alertas de desvío.
