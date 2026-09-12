@@ -126,3 +126,4 @@ Intalar/        instalador de Node y comandos de ayuda para el equipo
 - **[DEPLOY.md](DEPLOY.md)** — despliegue en la nube (Vercel + Render + Aiven).
 - **[DEPLOY-ONPREMISE.md](DEPLOY-ONPREMISE.md)** — despliegue en servidor propio.
 - **[CLAUDE.md](CLAUDE.md)** — guía para trabajar el repo con Claude Code.
+- **[RAMAS.md](RAMAS.md)** — qué es cada rama, cuál se despliega y cómo se trabaja.
