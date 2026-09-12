@@ -24,6 +24,15 @@ course assignments, and `README.md` for setup instructions.
 > when ADR-001 was accepted (`docs/adr/ADR-001-stack.md`) and only exists in git
 > history.
 
+### Branches
+
+`main` is the only working branch and the one that deploys (Render + Vercel).
+`testing` is frozen at `a25da85` for the testers — never merge into it, never
+update it. Branch off an up-to-date `main`, keep branches short-lived, and
+**add a row to `RAMAS.md` when you create one**, not later. Avoid stacking a
+PR on another PR's branch: deleting the base branch closes the stacked PR
+instead of retargeting it.
+
 ### User roles
 - **AdministradorSistema** — superuser; manages accounts and role assignment
 - **PersonalAdministrativo** — creates/edits projects, planning and materials; approves reports
