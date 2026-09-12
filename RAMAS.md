@@ -22,7 +22,7 @@ para qué estaba dentro de dos semanas.
 
 | Rama | Desde | Para qué | PR |
 |---|---|---|---|
-| `claude/adr-001-fase-2b-5` | `main` @ `67b479a` (2026-09-12) | Fases 2b y 5 del [plan de ADR-001](docs/adr/PLAN-ADR-001.md): pruebas de integración sobre MariaDB y CI en GitHub Actions. | pendiente |
+| `claude/adr-001-fase-2b-5` | `main` @ `67b479a` (2026-09-12) | Fases 2b y 5 del [plan de ADR-001](docs/adr/PLAN-ADR-001.md): pruebas de integración sobre MariaDB y CI en GitHub Actions. | [#7](https://github.com/AcostaAlex10/ingenieria-en-software-proyecto/pull/7) |
 
 ---
 

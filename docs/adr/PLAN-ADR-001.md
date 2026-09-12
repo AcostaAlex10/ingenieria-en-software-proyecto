@@ -149,6 +149,7 @@ contrastarse contra ella, en lugar de repetirla a mano como hoy.
 > **Hecho.** `back/tests/Integracion/` con 13 pruebas contra MariaDB: pausa y
 > reactivación (incluido el caso en que vuelve a `en_revision` porque hay un
 > reporte final esperando), cancelación, y el cierre por reporte final completo.
+> En CI corren las 466 pruebas sin saltear ninguna.
 >
 > `CasoConBase` levanta el esquema real y vacía las tablas entre pruebas. No
 > puede tocar una base que no sea descartable: lee **solo** las variables
@@ -228,7 +229,11 @@ pasan igual que antes, y `index.php` baja de 549 líneas a un arranque + la tabl
 > **Hecho.** `.github/workflows/ci.yml` con los tres jobs, disparado en `main` y
 > en los pull request hacia `main`. `testing` no se toca: su
 > `pages-testing.yml` sigue siendo el único que corre ahí. El badge quedó en el
-> README.
+> README. La primera corrida dio los tres jobs en verde.
+>
+> Cobertura medida ahí (pcov, que en local no está): **100 % de líneas y de
+> métodos** en `Sgso\Reglas` y `Sgso\Ruteo` — 174 líneas, 22 métodos, 6
+> clases. Era el objetivo que la fase 2a había dejado sin medir.
 
 Un workflow nuevo, `.github/workflows/ci.yml`, que corre en `push` a `main` y en
 todo pull request:
