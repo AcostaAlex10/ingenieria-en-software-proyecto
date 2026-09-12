@@ -2,29 +2,30 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../src/Env.php';
-require_once __DIR__ . '/../src/Cors.php';
-require_once __DIR__ . '/../src/Database.php';
-require_once __DIR__ . '/../src/Jwt.php';
-require_once __DIR__ . '/../src/AuthMiddleware.php';
-require_once __DIR__ . '/../src/AuthController.php';
-require_once __DIR__ . '/../src/ProyectoRepositoryInterface.php';
-require_once __DIR__ . '/../src/MySqlProyectoRepository.php';
-require_once __DIR__ . '/../src/ProyectoController.php';
-require_once __DIR__ . '/../src/PlanificacionController.php';
-require_once __DIR__ . '/../src/AvanceController.php';
-require_once __DIR__ . '/../src/AsistenciaController.php';
-require_once __DIR__ . '/../src/IncidenciaController.php';
-require_once __DIR__ . '/../src/MaterialController.php';
-require_once __DIR__ . '/../src/MaterialObraController.php';
-require_once __DIR__ . '/../src/DocumentoController.php';
-require_once __DIR__ . '/../src/ReporteController.php';
-require_once __DIR__ . '/../src/InactividadController.php';
-require_once __DIR__ . '/../src/ItemExcedenteController.php';
-require_once __DIR__ . '/../src/AnalisisController.php';
-require_once __DIR__ . '/../src/MaquinariaController.php';
-require_once __DIR__ . '/../src/EtapaPlanificacionController.php';
-require_once __DIR__ . '/../src/UsuarioController.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use Sgso\AnalisisController;
+use Sgso\AsistenciaController;
+use Sgso\AuthController;
+use Sgso\AuthMiddleware;
+use Sgso\AvanceController;
+use Sgso\Cors;
+use Sgso\Database;
+use Sgso\DocumentoController;
+use Sgso\Env;
+use Sgso\EtapaPlanificacionController;
+use Sgso\InactividadController;
+use Sgso\IncidenciaController;
+use Sgso\ItemExcedenteController;
+use Sgso\MaquinariaController;
+use Sgso\MaterialController;
+use Sgso\MaterialObraController;
+use Sgso\MySqlProyectoRepository;
+use Sgso\PlanificacionController;
+use Sgso\ProyectoController;
+use Sgso\ReporteController;
+use Sgso\UsuarioController;
+
 
 Env::cargar(__DIR__ . '/../.env');
 

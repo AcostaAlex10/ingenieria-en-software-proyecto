@@ -1,0 +1,32 @@
+{
+    "name": "sgso/back",
+    "description": "API REST de SGSO (Sistema de Gestion y Seguimiento Operativo de Obras) en PHP sobre MariaDB",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Sgso\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Sgso\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpstan": "phpstan analyse"
+    }
+}

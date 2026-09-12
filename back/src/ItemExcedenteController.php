@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Items o trabajos excedentes no contemplados en la planificacion inicial
  * (RF22). Permiten reflejar modificaciones surgidas durante la ejecucion.

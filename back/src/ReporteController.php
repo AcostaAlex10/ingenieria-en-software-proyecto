@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Reportes operativos de obra con flujo de aprobacion (RF21) y observaciones
  * del revisor (RF17).

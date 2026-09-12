@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/ProyectoRepositoryInterface.php';
+namespace Sgso;
+
+use PDO;
+
 
 /**
  * Implementacion de ProyectoRepositoryInterface con MariaDB/MySQL (PDO).

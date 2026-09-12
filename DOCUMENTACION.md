@@ -125,10 +125,10 @@ computadora de un integrante.
 
 La cátedra exige PHP sobre MariaDB. Durante el desarrollo distintos integrantes
 prototiparon módulos por separado y llegó a existir una implementación en
-Node.js + Express + TypeScript, que sigue en el repositorio bajo `back-node/`.
-Para la entrega se unificó todo en el backend PHP de `back/`, que es el que está
-desplegado. `back-node/` se conserva como referencia, no se despliega y no debe
-usarse para nuevas funcionalidades.
+Node.js + Express + TypeScript bajo `back-node/`. Para la entrega se unificó todo
+en el backend PHP de `back/`, que es el que está desplegado; la alternativa en
+Node se borró del árbol de trabajo al aceptarse
+[ADR-001](docs/adr/ADR-001-stack.md) y queda en el historial de git.
 
 ---
 
@@ -312,15 +312,10 @@ aceptación formales.
 1. **No hay pruebas automatizadas.** Ni en el frontend ni en el backend hay tests
    ni scripts de lint. La verificación fue manual, de extremo a extremo, sobre el
    entorno desplegado.
-2. **Backend duplicado.** `back-node/` reimplementa el backend en Node. Mientras
-   siga en el repositorio hay riesgo de que alguien modifique el backend
-   equivocado o de que ambos se desincronicen.
-3. **Migraciones duplicadas.** `back/sql/schema.sql` y `back-node/migrations/`
-   describen el mismo modelo por separado; solo el primero es el vigente.
-4. **Normalización pendiente.** `proyecto.encargado` es texto libre en lugar de una
+2. **Normalización pendiente.** `proyecto.encargado` es texto libre en lugar de una
    referencia a `usuario`, y `proyecto.avance` se guarda como campo plano en vez de
    calcularse a partir de `avance_fisico`, como preveía el diagrama de clases del TP3.
-5. **Documentación por módulo.** Los módulos agregados después del TP4 no tienen
+3. **Documentación por módulo.** Los módulos agregados después del TP4 no tienen
    criterios de aceptación escritos.
 
 ---

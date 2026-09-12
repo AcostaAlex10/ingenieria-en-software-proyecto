@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Envio de emails transaccionales usando la API HTTP de Brevo (ex-Sendinblue).
  * No necesita librerias (file_get_contents). Las credenciales vienen por

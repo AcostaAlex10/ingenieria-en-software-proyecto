@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Periodos de inactividad de la obra con su motivo (RF25). Sirven para
  * justificar paradas y contextualizar desvios de avance.

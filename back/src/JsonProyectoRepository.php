@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/ProyectoRepositoryInterface.php';
+namespace Sgso;
+
 
 /**
  * Implementación temporal de ProyectoRepositoryInterface usando un

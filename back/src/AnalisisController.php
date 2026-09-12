@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Analisis y alertas (RF11/RF13). No tiene tablas propias: calcula
  * indicadores a partir de los datos existentes (proyectos, planificacion,

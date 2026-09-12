@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Controlador de Planificacion. Cada proyecto tiene UNA planificacion
  * (avance esperado total). Portado del backend Node al stack PHP/MariaDB.

@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Gestion de maquinaria. Cubre:
  *  - RF23: registro de uso (horas, combustible, produccion) por maquina.

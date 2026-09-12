@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/Env.php';
+namespace Sgso;
+
+use PDO;
+
 
 /**
  * Conexion a MariaDB/MySQL mediante PDO (singleton).

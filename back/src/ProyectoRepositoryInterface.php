@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
 /**
  * Contrato del repositorio de Proyectos (RF01: registrar, modificar,
  * eliminar y consultar proyectos de obra).

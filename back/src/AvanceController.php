@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Controlador de Avances fisicos. Cada avance se carga contra una
  * planificacion. Incluye un resumen que compara avance esperado vs real.

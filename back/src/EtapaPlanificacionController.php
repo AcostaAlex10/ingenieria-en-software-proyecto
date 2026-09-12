@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use DateTime;
+use PDO;
+
 /**
  * CRUD de etapas de planificacion (1-a-muchos con planificacion).
  * Cada etapa tiene un rango de fechas y un peso porcentual; la suma de

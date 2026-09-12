@@ -1,21 +1,23 @@
 # Backend SGSO — API REST en PHP
 
-API REST en PHP plano (sin framework, acceso a datos con PDO) sobre MariaDB / MySQL.
+API REST en PHP sin framework (acceso a datos con PDO) sobre MariaDB / MySQL.
 Es el backend del proyecto: el que está desplegado en Render y el que consume el
-frontend. La alternativa en Node de `../back-node/` no se despliega.
+frontend.
 
 Para el contexto del sistema ver [`../DOCUMENTACION.md`](../DOCUMENTACION.md);
 para levantar todo el stack, [`../README.md`](../README.md).
 
 ## Requisitos
 
-- PHP 8.1 o superior (usa `readonly` y `match`).
+- PHP 8.2 o superior (el contenedor de Render corre 8.3).
 - Extensión PDO con driver MySQL.
-- No hace falta Composer ni librerías externas.
+- [Composer](https://getcomposer.org/). No hay dependencias de producción: se usa
+  para el autoload PSR-4 y para las herramientas de desarrollo (ADR-001 §5.1).
 
 ## Cómo levantarlo
 
 ```bash
+composer install          # genera vendor/autoload.php (sin esto no arranca)
 cp .env.example .env      # datos de la base, JWT_SECRET, credenciales de Brevo
 php sql/migrar.php        # crea las tablas (idempotente)
 php sql/seed.php          # crea el usuario administrador inicial
@@ -31,12 +33,17 @@ La API queda en `http://localhost:8000/api`. Con Apache o XAMPP, el
 
 ## Estructura
 
+Las clases de `src/` viven bajo el namespace `Sgso\` y las carga el autoload PSR-4
+de Composer; no hay `require_once` a mano.
+
 ```
 back/
+  composer.json   <- autoload PSR-4 (Sgso\ -> src/) y herramientas de desarrollo
+  composer.lock   <- versiones fijadas; se commitea
   public/
     index.php     <- único punto de entrada: parsea la ruta, valida el token y delega
     .htaccess     <- reescritura para Apache
-  src/
+  src/            <- namespace Sgso\
     Env.php, Cors.php, Database.php     <- configuración, CORS y conexión PDO
     Jwt.php, AuthMiddleware.php         <- emisión y validación de tokens
     Mailer.php                          <- correo de recuperación (Brevo)

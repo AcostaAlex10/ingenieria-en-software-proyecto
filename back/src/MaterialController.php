@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+namespace Sgso;
+
+use PDO;
+
 /**
  * Catalogo global de materiales (RF04). No depende de una obra: es la lista
  * precargada (y ampliable) desde la cual se asignan materiales a las obras.
