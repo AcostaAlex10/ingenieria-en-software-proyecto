@@ -6,3 +6,7 @@ data/proyectos.json
 # Cuando agreguemos Composer o variables de entorno:
 /vendor/
 .env
+
+# Fase 2/3 de ADR-001
+.phpunit.cache/
+.phpunit.result.cache

@@ -21,9 +21,9 @@ Medido sobre el código el 2026-09-11, en `main` @ `6643888`:
 | # | Tarea (ADR §5) | Estado |
 |---|---|---|
 | 1 | `composer.json` con autoload PSR-4, mover `back/src/` a namespaces | **hecho** (Fase 1) |
-| 2 | PHPUnit sobre ciclo de vida, permisos por rol y cierre por reporte final | pendiente |
-| 3 | PHPStan en nivel medio | pendiente |
-| 4 | Reemplazar el ruteo de 29 ramas de `index.php` | pendiente |
+| 2 | PHPUnit sobre ciclo de vida, permisos por rol y cierre por reporte final | **2a hecha**; falta 2b (integración) |
+| 3 | PHPStan en nivel medio | **hecho** (nivel 5, 0 errores) |
+| 4 | Reemplazar el ruteo de 29 ramas de `index.php` | **hecho** (tabla propia) |
 | 5 | CI en GitHub Actions | pendiente |
 | 6 | `typescript` en el front y script `typecheck` | **hecho** (`366d379`) |
 
@@ -55,7 +55,11 @@ Git no pierde nada: el commit queda en el historial y el ADR deja el puntero.
 Si preferís conservarlo visible, la alternativa es un `README` en la carpeta que
 diga que está congelado. Es más débil, pero es tu llamada.
 
-### D2. Slim o tabla de rutas propia (punto 4 del ADR)
+### D2. Slim o tabla de rutas propia — **resuelto el 2026-09-11: tabla propia**
+
+> Alex aprobó la recomendación. Se implementó en la Fase 4 sin agregar ninguna
+> dependencia: el `Dockerfile` sigue igual y el arranque en frío de Render no
+> cambia.
 
 **Recomendación: tabla de rutas, sin framework.**
 
@@ -118,6 +122,13 @@ Por eso se parte en dos, y la primera mitad es la que tiene casi todo el valor.
 
 ### 2a. Extraer las reglas puras y probarlas sin base
 
+> **Hecho.** Quedaron `Sgso\Reglas\CicloDeVida` y `Sgso\Reglas\Permisos`, con
+> 115 pruebas en verde. Los cuatro controladores que decidían el estado por su
+> cuenta ahora delegan, y las constantes `ROLES_*` de `index.php` salen de
+> `Permisos`. Una prueba contrasta los estados contra
+> `FRONT/src/app/estadosObra.ts`: la próxima desincronización con el front sale
+> en rojo en vez de aparecer en la demo.
+
 - `Sgso\Reglas\CicloDeVida` — la máquina de estados de los siete estados del TP3:
   qué transición es legal desde dónde. Hoy está repartida entre
   `InactividadController::sincronizarEstado()`, `ProyectoController` (cancelación)
@@ -150,6 +161,11 @@ cubiertas.
 
 ## Fase 3 — PHPStan (ADR §5.3)
 
+> **Hecho, y sin baseline.** El nivel 5 encontró solo tres redundancias — dos en
+> código de producción y una en una prueba propia — y se arreglaron. El pozo era
+> chico, así que el nivel queda en 5 y `phpstan.neon` cubre `src`, `public` y
+> `tests`.
+
 `phpstan.neon` apuntando a `back/src` y `back/public`.
 
 El ADR pide "nivel medio, subiendo de a poco". El camino concreto: correr nivel 5
@@ -167,6 +183,16 @@ y el nivel está declarado en el `.neon`.
 ---
 
 ## Fase 4 — Tabla de rutas (ADR §5.4)
+
+> **Hecho.** `Sgso\Ruteo`: `Tabla` (117 rutas como dato), `Despachador` (puro),
+> `Ruta` y `Resolucion`. `index.php` baja de 549 a 281 líneas y queda con el
+> arranque más un mapa `clave => closure`, que es lo único que conoce a los
+> controladores. Ninguna firma de controlador cambió.
+>
+> Verificado comparando el ruteo viejo contra el nuevo en 35 peticiones: la
+> única diferencia es la buscada (`DELETE /api/health` pasa de 200 a 405).
+> Las guardas de rol se contrastaron una por una: DOC 15, AVANCE 9,
+> GESTION_OBRA + REPORTE_APROBAR 16, ADMIN 2.
 
 Con la decisión D2 tomada: extraer las 29 ramas de `index.php` a un array de
 rutas declarativo — método, patrón, roles exigidos, controlador y método — y un

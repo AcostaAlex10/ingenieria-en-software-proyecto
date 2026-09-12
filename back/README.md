@@ -31,6 +31,18 @@ php -S localhost:8000 -t public
 La API queda en `http://localhost:8000/api`. Con Apache o XAMPP, el
 `public/.htaccess` ya trae la reescritura para que todo pase por `index.php`.
 
+## Pruebas y análisis estático
+
+```bash
+composer test       # PHPUnit sobre back/tests/
+composer phpstan    # PHPStan nivel 5; tiene que quedar en 0 errores
+```
+
+Lo que está probado son las reglas puras de `src/Reglas/`: `CicloDeVida` (el
+ciclo de vida de la obra del TP3) y `Permisos` (los grupos de roles de RF19).
+Los controladores todavía no tienen pruebas: eso es la fase 2b del
+[plan de ADR-001](../docs/adr/PLAN-ADR-001.md) y necesita una base MariaDB en CI.
+
 ## Estructura
 
 Las clases de `src/` viven bajo el namespace `Sgso\` y las carga el autoload PSR-4
@@ -41,9 +53,14 @@ back/
   composer.json   <- autoload PSR-4 (Sgso\ -> src/) y herramientas de desarrollo
   composer.lock   <- versiones fijadas; se commitea
   public/
-    index.php     <- único punto de entrada: parsea la ruta, valida el token y delega
+    index.php     <- arranque, mapa de manejadores, token y guarda de rol
     .htaccess     <- reescritura para Apache
+  phpunit.xml     <- configuración de PHPUnit
+  phpstan.neon    <- nivel 5 sobre src, public y tests
+  tests/          <- pruebas, namespace Sgso\Tests\
   src/            <- namespace Sgso\
+    Ruteo/                              <- tabla de rutas y despachador (dato + resolución pura)
+    Reglas/                             <- reglas puras y probadas (CicloDeVida, Permisos)
     Env.php, Cors.php, Database.php     <- configuración, CORS y conexión PDO
     Jwt.php, AuthMiddleware.php         <- emisión y validación de tokens
     Mailer.php                          <- correo de recuperación (Brevo)
@@ -63,9 +80,9 @@ back/
 El login devuelve un **JWT** que hay que enviar en `Authorization: Bearer <token>`.
 Las contraseñas se guardan hasheadas con bcrypt, nunca en texto plano.
 
-Los grupos de roles autorizados están declarados como constantes al inicio de
-`public/index.php`: `ROLES_GESTION_OBRA`, `ROLES_AVANCE`, `ROLES_DOC`,
-`ROLES_REPORTE_APROBAR` y `ROLES_ADMIN`.
+Los grupos de roles viven en `Sgso\Reglas\Permisos` (`GESTION_OBRA`, `AVANCE`,
+`DOC`, `REPORTE_APROBAR`, `ADMIN`), que es donde se prueban. `public/index.php`
+los reexpone con los nombres `ROLES_*` que usan sus rutas.
 
 | Método | Ruta | Protección |
 |---|---|---|

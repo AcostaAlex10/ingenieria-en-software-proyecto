@@ -23,9 +23,12 @@ use Sgso\MaterialObraController;
 use Sgso\MySqlProyectoRepository;
 use Sgso\PlanificacionController;
 use Sgso\ProyectoController;
+use Sgso\Reglas\Permisos;
 use Sgso\ReporteController;
+use Sgso\Ruteo\Despachador;
+use Sgso\Ruteo\Resolucion;
+use Sgso\Ruteo\Tabla;
 use Sgso\UsuarioController;
-
 
 Env::cargar(__DIR__ . '/../.env');
 
@@ -55,13 +58,6 @@ header('Content-Type: application/json; charset=utf-8');
 $jwtSecreto = Env::get('JWT_SECRET', 'cambiar_esta_clave');
 $jwtSegundos = (int) Env::get('JWT_SEGUNDOS', '28800'); // 8 horas por defecto
 
-// Grupos de roles autorizados (RF19). El AdministradorSistema es superusuario.
-const ROLES_GESTION_OBRA = ['AdministradorSistema', 'PersonalAdministrativo']; // crear/editar/eliminar obra, planificacion y materiales
-const ROLES_AVANCE = ['AdministradorSistema', 'PersonalTecnico'];              // registrar avance, asistencia, incidencias y consumos
-const ROLES_DOC = ['AdministradorSistema', 'PersonalAdministrativo', 'PersonalTecnico']; // cargar documentacion, reportes, inactividad y excedentes (todos menos Gerente)
-const ROLES_REPORTE_APROBAR = ['AdministradorSistema', 'PersonalAdministrativo'];        // aprobar/rechazar reportes (RF21)
-const ROLES_ADMIN = ['AdministradorSistema'];                                            // gestionar cuentas y roles (HU16)
-
 $db = Database::conexion();
 
 $controlador = new ProyectoController(new MySqlProyectoRepository($db));
@@ -81,432 +77,167 @@ $maquinaria = new MaquinariaController($db);
 $etapaCtrl = new EtapaPlanificacionController($db);
 $usuarioCtrl = new UsuarioController($db);
 
-// --- Parseo de la ruta ---
+/**
+ * Manejadores: la unica parte que conoce a los controladores.
+ *
+ * El metodo, el camino y la guarda de rol de cada endpoint son dato y viven en
+ * Sgso\Ruteo\Tabla, que se puede recorrer en las pruebas. Aca solo esta a quien
+ * se le llama, indexado por la clave que la tabla declara.
+ *
+ * Son funciones flecha a proposito: capturan los controladores sin repetir un
+ * `use` en cada una. No llevan tipo de retorno porque una funcion flecha
+ * siempre devuelve el valor de su expresion, y `: void` no lo admite.
+ *
+ * @var array<string, callable(array<string, string>, ?array<string, mixed>): mixed> $manejadores
+ */
+$manejadores = [
+    // Autenticacion (RF19)
+    'auth.login' => fn (array $p, ?array $u) => $auth->login(leerCuerpoJson()),
+    'auth.olvide' => fn (array $p, ?array $u) => $auth->olvide(leerCuerpoJson()),
+    'auth.restablecer' => fn (array $p, ?array $u) => $auth->restablecer(leerCuerpoJson()),
+    'auth.register' => fn (array $p, ?array $u) => $auth->registrar(leerCuerpoJson(), (array) $u),
+    'auth.me' => fn (array $p, ?array $u) => $auth->yo((array) $u),
+    'health.mostrar' => fn (array $p, ?array $u) => responder(200, ['status' => 'ok']),
+
+    // Reportes y aprobacion (RF21/RF17)
+    'reportes.listar' => fn (array $p, ?array $u) => $reporte->listar($_GET['estado'] ?? null),
+    'reportes.crear' => fn (array $p, ?array $u) => $reporte->crear(leerCuerpoJson(), (array) $u),
+    'reportes.enviar' => fn (array $p, ?array $u) => $reporte->enviar($p['id']),
+    'reportes.aprobar' => fn (array $p, ?array $u) => $reporte->aprobar($p['id'], leerCuerpoJson()),
+    'reportes.rechazar' => fn (array $p, ?array $u) => $reporte->rechazar($p['id'], leerCuerpoJson()),
+    'reportes.editar' => fn (array $p, ?array $u) => $reporte->editar($p['id'], leerCuerpoJson()),
+    'reportes.eliminar' => fn (array $p, ?array $u) => $reporte->eliminar($p['id']),
+
+    // Maquinaria (RF23/RF24/RF27/RF28)
+    'maquinaria.listar' => fn (array $p, ?array $u) => $maquinaria->listar(),
+    'maquinaria.crear' => fn (array $p, ?array $u) => $maquinaria->crear(leerCuerpoJson()),
+    'maquinaria.operarios' => fn (array $p, ?array $u) => $maquinaria->rendimientoOperarios(),
+    'maquinaria.eliminar' => fn (array $p, ?array $u) => $maquinaria->eliminar($p['id']),
+    'maquinaria.registro.eliminar' => fn (array $p, ?array $u) => $maquinaria->eliminarRegistro($p['id']),
+    'maquinaria.falla.eliminar' => fn (array $p, ?array $u) => $maquinaria->eliminarFalla($p['id']),
+    'maquinaria.registros.listar' => fn (array $p, ?array $u) => $maquinaria->listarRegistros($p['id']),
+    'maquinaria.registros.crear' => fn (array $p, ?array $u) => $maquinaria->crearRegistro($p['id'], leerCuerpoJson()),
+    'maquinaria.fallas.listar' => fn (array $p, ?array $u) => $maquinaria->listarFallas($p['id']),
+    'maquinaria.fallas.crear' => fn (array $p, ?array $u) => $maquinaria->crearFalla($p['id'], leerCuerpoJson()),
+
+    // Usuarios (HU16) y analisis (RF11/RF13)
+    'usuarios.listar' => fn (array $p, ?array $u) => $usuarioCtrl->listar(),
+    'usuarios.actualizar' => fn (array $p, ?array $u) => $usuarioCtrl->actualizar($p['id'], leerCuerpoJson(), (array) $u),
+    'analisis.resumen' => fn (array $p, ?array $u) => $analisis->resumen($u['rol'] ?? null),
+
+    // Catalogo de materiales (RF04)
+    'materiales.listar' => fn (array $p, ?array $u) => $material->listar(),
+    'materiales.crear' => fn (array $p, ?array $u) => $material->crear(leerCuerpoJson()),
+
+    // Planificacion, etapas y avances
+    'planificacion.actualizar' => fn (array $p, ?array $u) => $planificacion->actualizar($p['id'], leerCuerpoJson()),
+    'planificacion.eliminar' => fn (array $p, ?array $u) => $planificacion->eliminar($p['id']),
+    'planificacion.proyecto.obtener' => fn (array $p, ?array $u) => $planificacion->obtenerPorProyecto($p['id']),
+    'planificacion.proyecto.crear' => fn (array $p, ?array $u) => $planificacion->crear($p['id'], leerCuerpoJson()),
+    'etapa.listar' => fn (array $p, ?array $u) => $etapaCtrl->listar($p['id']),
+    'etapa.crear' => fn (array $p, ?array $u) => $etapaCtrl->crear($p['id'], leerCuerpoJson()),
+    'etapa.actualizar' => fn (array $p, ?array $u) => $etapaCtrl->actualizar($p['id'], leerCuerpoJson()),
+    'etapa.eliminar' => fn (array $p, ?array $u) => $etapaCtrl->eliminar($p['id']),
+    'avance.mostrar' => fn (array $p, ?array $u) => $avance->mostrar($p['id']),
+    'avance.actualizar' => fn (array $p, ?array $u) => $avance->actualizar($p['id'], leerCuerpoJson()),
+    'avance.eliminar' => fn (array $p, ?array $u) => $avance->eliminar($p['id']),
+    'avance.listar' => fn (array $p, ?array $u) => $avance->listarPorPlan($p['id']),
+    'avance.crear' => fn (array $p, ?array $u) => $avance->crear($p['id'], leerCuerpoJson()),
+    'avance.resumen' => fn (array $p, ?array $u) => $avance->resumen($p['id']),
+
+    // Subrecursos de la obra
+    'asistencias.listar' => fn (array $p, ?array $u) => $asistencia->listarPorProyecto($p['id']),
+    'asistencias.crear' => fn (array $p, ?array $u) => $asistencia->crear($p['id'], leerCuerpoJson()),
+    'asistencia.eliminar' => fn (array $p, ?array $u) => $asistencia->eliminar($p['id']),
+    'incidencias.listar' => fn (array $p, ?array $u) => $incidencia->listarPorProyecto($p['id']),
+    'incidencias.crear' => fn (array $p, ?array $u) => $incidencia->crear($p['id'], leerCuerpoJson()),
+    'incidencia.eliminar' => fn (array $p, ?array $u) => $incidencia->eliminar($p['id']),
+    'materiales.proyecto.listar' => fn (array $p, ?array $u) => $materialObra->listarPorProyecto($p['id']),
+    'materiales.proyecto.asignar' => fn (array $p, ?array $u) => $materialObra->asignar($p['id'], leerCuerpoJson()),
+    'material.consumos.listar' => fn (array $p, ?array $u) => $materialObra->listarConsumos($p['id']),
+    'material.consumos.crear' => fn (array $p, ?array $u) => $materialObra->crearConsumo($p['id'], leerCuerpoJson()),
+    'material.asignacion.eliminar' => fn (array $p, ?array $u) => $materialObra->eliminarAsignacion($p['id']),
+    'material.consumo.eliminar' => fn (array $p, ?array $u) => $materialObra->eliminarConsumo($p['id']),
+    'documentos.listar' => fn (array $p, ?array $u) => $documento->listarPorProyecto($p['id']),
+    'documentos.crear' => fn (array $p, ?array $u) => $documento->crear($p['id'], leerCuerpoJson()),
+    'documento.eliminar' => fn (array $p, ?array $u) => $documento->eliminar($p['id']),
+    'inactividades.listar' => fn (array $p, ?array $u) => $inactividad->listarPorProyecto($p['id']),
+    'inactividades.crear' => fn (array $p, ?array $u) => $inactividad->crear($p['id'], leerCuerpoJson()),
+    'inactividad.cerrar' => fn (array $p, ?array $u) => $inactividad->cerrar($p['id'], leerCuerpoJson()),
+    'inactividad.eliminar' => fn (array $p, ?array $u) => $inactividad->eliminar($p['id']),
+    'excedentes.listar' => fn (array $p, ?array $u) => $itemExcedente->listarPorProyecto($p['id']),
+    'excedentes.crear' => fn (array $p, ?array $u) => $itemExcedente->crear($p['id'], leerCuerpoJson()),
+    'excedente.eliminar' => fn (array $p, ?array $u) => $itemExcedente->eliminar($p['id']),
+
+    // Obras (CU1, CU2, CU3)
+    'proyectos.listar' => fn (array $p, ?array $u) => $controlador->listar($_GET['q'] ?? null, $u['rol'] ?? null),
+    'proyectos.mostrar' => fn (array $p, ?array $u) => $controlador->mostrar($p['id'], $u['rol'] ?? null),
+    'proyectos.crear' => fn (array $p, ?array $u) => $controlador->registrar(leerCuerpoJson()),
+    'proyectos.editar' => fn (array $p, ?array $u) => $controlador->modificar($p['id'], leerCuerpoJson()),
+    'proyectos.eliminar' => fn (array $p, ?array $u) => $controlador->eliminar($p['id']),
+];
+
+/**
+ * Subrecursos nombrados sin id: /proyectos/asistencia, /maquinaria/registro y
+ * compania.
+ *
+ * Existen como rutas propias porque, sin ellas, /proyectos/asistencia caeria en
+ * /proyectos/{id} y la API contestaria como si "asistencia" fuera el id de una
+ * obra. Los textos son los que ya respondia el ruteo anterior.
+ */
+$manejadores['error.falta.registro'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id del registro']);
+$manejadores['error.falta.falla'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de la falla']);
+$manejadores['error.falta.planificacion'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de planificacion']);
+$manejadores['error.falta.avance'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id del avance']);
+$manejadores['error.falta.etapa'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de la etapa']);
+$manejadores['error.falta.asistencia'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de asistencia']);
+$manejadores['error.falta.incidencia'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de incidencia']);
+$manejadores['error.falta.asignacion'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de asignación']);
+$manejadores['error.falta.consumo'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de consumo']);
+$manejadores['error.falta.documento'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de documento']);
+$manejadores['error.falta.periodo'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de período']);
+$manejadores['error.falta.item'] = fn (array $p, ?array $u) => responder(404, ['error' => 'Falta el id de ítem']);
+
+// --- Ruteo ---
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '/';
-$uri = rtrim($uri, '/');
-$ruta = preg_replace('#^/api#', '', $uri);
+$ruta = preg_replace('#^/api#', '', rtrim($uri, '/')) ?? '';
 
-$segmentos = array_values(array_filter(explode('/', $ruta)));
-$metodoHttp = $_SERVER['REQUEST_METHOD'];
-$recurso = $segmentos[0] ?? null;
+$resultado = Despachador::resolver($_SERVER['REQUEST_METHOD'], $ruta, Tabla::rutas());
 
-// ============================================================
-//  Autenticacion:  /auth/login, /auth/register, /auth/me
-// ============================================================
-if ($recurso === 'auth') {
-    $accion = $segmentos[1] ?? null;
-
-    switch (true) {
-        case $metodoHttp === 'POST' && $accion === 'login':
-            $auth->login(leerCuerpoJson());
-            break;
-
-        case $metodoHttp === 'POST' && $accion === 'olvide':
-            $auth->olvide(leerCuerpoJson());
-            break;
-
-        case $metodoHttp === 'POST' && $accion === 'restablecer':
-            $auth->restablecer(leerCuerpoJson());
-            break;
-
-        case $metodoHttp === 'POST' && $accion === 'register':
-            $solicitante = AuthMiddleware::usuarioAutenticado($jwtSecreto);
-            if ($solicitante === null) { noAutenticado(); break; }
-            $auth->registrar(leerCuerpoJson(), $solicitante);
-            break;
-
-        case $metodoHttp === 'GET' && $accion === 'me':
-            $solicitante = AuthMiddleware::usuarioAutenticado($jwtSecreto);
-            if ($solicitante === null) { noAutenticado(); break; }
-            $auth->yo($solicitante);
-            break;
-
-        default:
-            responder(404, ['error' => 'Ruta de autenticacion no encontrada']);
+if ($resultado->estado === Resolucion::METODO_NO_PERMITIDO) {
+    // En un camino protegido el token va primero, como en el ruteo anterior:
+    // si no, un anonimo podria mapear la API a fuerza de probar metodos.
+    if (!Despachador::caminoEsPublico($ruta, Tabla::rutas())) {
+        exigirAutenticacion($jwtSecreto);
     }
+    responder(405, ['error' => 'Metodo no permitido']);
     exit;
 }
 
-// ============================================================
-//  Health-check
-// ============================================================
-if ($recurso === 'health') {
-    echo json_encode(['status' => 'ok']);
+$rutaDeclarada = $resultado->ruta;
+if ($rutaDeclarada === null) {
+    responder(404, ['error' => str_starts_with($ruta, '/auth')
+        ? 'Ruta de autenticacion no encontrada'
+        : 'Recurso no encontrado']);
     exit;
 }
 
-// ============================================================
-//  Reportes y aprobacion:  /reportes  (RF21/RF17)
-// ============================================================
-if ($recurso === 'reportes') {
+// Una ruta publica no lleva roles: lo garantiza la prueba de la tabla.
+$usuario = null;
+if (!$rutaDeclarada->publica) {
     $usuario = exigirAutenticacion($jwtSecreto);
-    $idRep = $segmentos[1] ?? null;
-    $accion = $segmentos[2] ?? null;
+    if ($rutaDeclarada->roles !== null) {
+        exigirRol($usuario, $rutaDeclarada->roles);
+    }
+}
 
-    if ($idRep === null) {
-        switch ($metodoHttp) {
-            case 'GET':  $reporte->listar($_GET['estado'] ?? null); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $reporte->crear(leerCuerpoJson(), $usuario); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Acciones del flujo: enviar / aprobar / rechazar
-    if ($accion === 'enviar') {
-        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_DOC); $reporte->enviar($idRep); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-    if ($accion === 'aprobar') {
-        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_REPORTE_APROBAR); $reporte->aprobar($idRep, leerCuerpoJson()); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-    if ($accion === 'rechazar') {
-        if ($metodoHttp === 'POST') { exigirRol($usuario, ROLES_REPORTE_APROBAR); $reporte->rechazar($idRep, leerCuerpoJson()); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /reportes/{id}  -> editar / eliminar
-    switch ($metodoHttp) {
-        case 'PUT':    exigirRol($usuario, ROLES_DOC); $reporte->editar($idRep, leerCuerpoJson()); break;
-        case 'DELETE': exigirRol($usuario, ROLES_DOC); $reporte->eliminar($idRep); break;
-        default:       responder(405, ['error' => 'Metodo no permitido']);
-    }
+if (!isset($manejadores[$rutaDeclarada->manejador])) {
+    // No deberia pasar: TablaTest verifica que toda clave tenga su manejador.
+    responder(500, ['error' => 'Manejador de ruta no configurado']);
     exit;
 }
 
-// ============================================================
-//  Maquinaria:  /maquinaria  (RF23/RF24/RF27/RF28)
-// ============================================================
-if ($recurso === 'maquinaria') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-    $seg1 = $segmentos[1] ?? null;
-    $seg2 = $segmentos[2] ?? null;
-
-    if ($seg1 === null) {
-        switch ($metodoHttp) {
-            case 'GET':  $maquinaria->listar(); break;
-            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $maquinaria->crear(leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-    if ($seg1 === 'operarios') {
-        if ($metodoHttp === 'GET') { $maquinaria->rendimientoOperarios(); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-    if ($seg1 === 'registro') {
-        if ($seg2 === null) { responder(404, ['error' => 'Falta el id del registro']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $maquinaria->eliminarRegistro($seg2); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-    if ($seg1 === 'falla') {
-        if ($seg2 === null) { responder(404, ['error' => 'Falta el id de la falla']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $maquinaria->eliminarFalla($seg2); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-    $idMaq = $seg1;
-    if ($seg2 === 'registros') {
-        switch ($metodoHttp) {
-            case 'GET':  $maquinaria->listarRegistros($idMaq); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $maquinaria->crearRegistro($idMaq, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-    if ($seg2 === 'fallas') {
-        switch ($metodoHttp) {
-            case 'GET':  $maquinaria->listarFallas($idMaq); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $maquinaria->crearFalla($idMaq, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-    if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_GESTION_OBRA); $maquinaria->eliminar($idMaq); }
-    else { responder(405, ['error' => 'Metodo no permitido']); }
-    exit;
-}
-
-// ============================================================
-//  Gestion de usuarios:  /usuarios  (HU16, completa RF19)
-// ============================================================
-if ($recurso === 'usuarios') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-    exigirRol($usuario, ROLES_ADMIN);
-    $idUsr = $segmentos[1] ?? null;
-
-    if ($idUsr === null) {
-        if ($metodoHttp === 'GET') { $usuarioCtrl->listar(); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    if ($metodoHttp === 'PUT') { $usuarioCtrl->actualizar($idUsr, leerCuerpoJson(), $usuario); }
-    else { responder(405, ['error' => 'Metodo no permitido']); }
-    exit;
-}
-
-// ============================================================
-//  Analisis y alertas:  /analisis  (RF11/RF13)
-// ============================================================
-if ($recurso === 'analisis') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-    if ($metodoHttp === 'GET') { $analisis->resumen($usuario['rol'] ?? null); }
-    else { responder(405, ['error' => 'Metodo no permitido']); }
-    exit;
-}
-
-// ============================================================
-//  Catalogo de materiales:  /materiales  (RF04)
-// ============================================================
-if ($recurso === 'materiales') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-    switch ($metodoHttp) {
-        case 'GET':  $material->listar(); break;
-        case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $material->crear(leerCuerpoJson()); break;
-        default:     responder(405, ['error' => 'Metodo no permitido']);
-    }
-    exit;
-}
-
-// ============================================================
-//  Planificacion y Avances:  /planificacion/...
-// ============================================================
-if ($recurso === 'planificacion') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-
-    // /planificacion/avance/{id}  -> un avance puntual
-    if (($segmentos[1] ?? null) === 'avance') {
-        $idAvance = $segmentos[2] ?? null;
-        if ($idAvance === null) { responder(404, ['error' => 'Falta el id del avance']); exit; }
-        switch ($metodoHttp) {
-            case 'GET':    $avance->mostrar($idAvance); break;
-            case 'PUT':    exigirRol($usuario, ROLES_AVANCE); $avance->actualizar($idAvance, leerCuerpoJson()); break;
-            case 'DELETE': exigirRol($usuario, ROLES_AVANCE); $avance->eliminar($idAvance); break;
-            default:       responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // /planificacion/etapa/{id}  -> PUT / DELETE de una etapa puntual
-    if (($segmentos[1] ?? null) === 'etapa') {
-        $idEtapa = $segmentos[2] ?? null;
-        if ($idEtapa === null) { responder(404, ['error' => 'Falta el id de la etapa']); exit; }
-        switch ($metodoHttp) {
-            case 'PUT':    exigirRol($usuario, ROLES_GESTION_OBRA); $etapaCtrl->actualizar($idEtapa, leerCuerpoJson()); break;
-            case 'DELETE': exigirRol($usuario, ROLES_GESTION_OBRA); $etapaCtrl->eliminar($idEtapa); break;
-            default:       responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // /planificacion/{planId}/etapas  -> GET / POST etapas
-    if (($segmentos[2] ?? null) === 'etapas') {
-        $planId = $segmentos[1];
-        switch ($metodoHttp) {
-            case 'GET':  $etapaCtrl->listar($planId); break;
-            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $etapaCtrl->crear($planId, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // /planificacion/{planId}/avances[/resumen]
-    if (($segmentos[2] ?? null) === 'avances') {
-        $planId = $segmentos[1];
-        if (($segmentos[3] ?? null) === 'resumen') {
-            if ($metodoHttp === 'GET') { $avance->resumen($planId); }
-            else { responder(405, ['error' => 'Metodo no permitido']); }
-            exit;
-        }
-        switch ($metodoHttp) {
-            case 'GET':  $avance->listarPorPlan($planId); break;
-            case 'POST': exigirRol($usuario, ROLES_AVANCE); $avance->crear($planId, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // /planificacion/{id}  -> PUT / DELETE de la planificacion
-    $idPlan = $segmentos[1] ?? null;
-    if ($idPlan === null) { responder(404, ['error' => 'Falta el id de planificacion']); exit; }
-    switch ($metodoHttp) {
-        case 'PUT':    exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->actualizar($idPlan, leerCuerpoJson()); break;
-        case 'DELETE': exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->eliminar($idPlan); break;
-        default:       responder(405, ['error' => 'Metodo no permitido']);
-    }
-    exit;
-}
-
-// ============================================================
-//  Proyectos:  /proyectos  y  /proyectos/{id}/planificacion
-// ============================================================
-if ($recurso === 'proyectos') {
-    $usuario = exigirAutenticacion($jwtSecreto);
-    $id = $segmentos[1] ?? null;
-
-    // /proyectos/asistencia/{id}  -> DELETE de un registro de asistencia
-    if ($id === 'asistencia') {
-        $aid = $segmentos[2] ?? null;
-        if ($aid === null) { responder(404, ['error' => 'Falta el id de asistencia']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $asistencia->eliminar($aid); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/incidencia/{id}  -> DELETE de una incidencia
-    if ($id === 'incidencia') {
-        $iid = $segmentos[2] ?? null;
-        if ($iid === null) { responder(404, ['error' => 'Falta el id de incidencia']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $incidencia->eliminar($iid); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/material/{idAsignacion}[/consumos]  (RF10/RF12)
-    if ($id === 'material') {
-        $idAsig = $segmentos[2] ?? null;
-        if ($idAsig === null) { responder(404, ['error' => 'Falta el id de asignación']); exit; }
-        if (($segmentos[3] ?? null) === 'consumos') {
-            switch ($metodoHttp) {
-                case 'GET':  $materialObra->listarConsumos($idAsig); break;
-                case 'POST': exigirRol($usuario, ROLES_AVANCE); $materialObra->crearConsumo($idAsig, leerCuerpoJson()); break;
-                default:     responder(405, ['error' => 'Metodo no permitido']);
-            }
-            exit;
-        }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_GESTION_OBRA); $materialObra->eliminarAsignacion($idAsig); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/consumo/{id}  -> DELETE de un consumo de material
-    if ($id === 'consumo') {
-        $idc = $segmentos[2] ?? null;
-        if ($idc === null) { responder(404, ['error' => 'Falta el id de consumo']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_AVANCE); $materialObra->eliminarConsumo($idc); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/documento/{id}  -> DELETE de un documento
-    if ($id === 'documento') {
-        $idd = $segmentos[2] ?? null;
-        if ($idd === null) { responder(404, ['error' => 'Falta el id de documento']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $documento->eliminar($idd); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/inactividad/{id}  -> cerrar (PUT) o eliminar (DELETE) un periodo
-    if ($id === 'inactividad') {
-        $idp = $segmentos[2] ?? null;
-        if ($idp === null) { responder(404, ['error' => 'Falta el id de período']); exit; }
-        // Cerrar el periodo reactiva la obra; eliminarlo tambien, pero pierde
-        // el registro que RF25 pide conservar.
-        if ($metodoHttp === 'PUT') { exigirRol($usuario, ROLES_DOC); $inactividad->cerrar($idp, leerCuerpoJson()); }
-        elseif ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $inactividad->eliminar($idp); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // /proyectos/excedente/{id}  -> DELETE de un item excedente
-    if ($id === 'excedente') {
-        $idx = $segmentos[2] ?? null;
-        if ($idx === null) { responder(404, ['error' => 'Falta el id de ítem']); exit; }
-        if ($metodoHttp === 'DELETE') { exigirRol($usuario, ROLES_DOC); $itemExcedente->eliminar($idx); }
-        else { responder(405, ['error' => 'Metodo no permitido']); }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/asistencias  (RF06)
-    if (($segmentos[2] ?? null) === 'asistencias') {
-        switch ($metodoHttp) {
-            case 'GET':  $asistencia->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_AVANCE); $asistencia->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/incidencias  (RF09)
-    if (($segmentos[2] ?? null) === 'incidencias') {
-        switch ($metodoHttp) {
-            case 'GET':  $incidencia->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_AVANCE); $incidencia->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/materiales  (RF10/RF12)
-    if (($segmentos[2] ?? null) === 'materiales') {
-        switch ($metodoHttp) {
-            case 'GET':  $materialObra->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $materialObra->asignar($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/documentos  (RF16)
-    if (($segmentos[2] ?? null) === 'documentos') {
-        switch ($metodoHttp) {
-            case 'GET':  $documento->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $documento->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/inactividades  (RF25)
-    if (($segmentos[2] ?? null) === 'inactividades') {
-        switch ($metodoHttp) {
-            case 'GET':  $inactividad->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $inactividad->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/excedentes  (RF22)
-    if (($segmentos[2] ?? null) === 'excedentes') {
-        switch ($metodoHttp) {
-            case 'GET':  $itemExcedente->listarPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_DOC); $itemExcedente->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    // Sub-recurso: /proyectos/{id}/planificacion
-    if (($segmentos[2] ?? null) === 'planificacion') {
-        switch ($metodoHttp) {
-            case 'GET':  $planificacion->obtenerPorProyecto($id); break;
-            case 'POST': exigirRol($usuario, ROLES_GESTION_OBRA); $planificacion->crear($id, leerCuerpoJson()); break;
-            default:     responder(405, ['error' => 'Metodo no permitido']);
-        }
-        exit;
-    }
-
-    switch (true) {
-        case $metodoHttp === 'GET' && $id === null:    $controlador->listar($_GET['q'] ?? null, $usuario['rol'] ?? null); break;
-        case $metodoHttp === 'GET' && $id !== null:    $controlador->mostrar($id, $usuario['rol'] ?? null); break;
-        case $metodoHttp === 'POST' && $id === null:   exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->registrar(leerCuerpoJson()); break;
-        case $metodoHttp === 'PUT' && $id !== null:    exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->modificar($id, leerCuerpoJson()); break;
-        case $metodoHttp === 'DELETE' && $id !== null: exigirRol($usuario, ROLES_GESTION_OBRA); $controlador->eliminar($id); break;
-        default: responder(405, ['error' => 'Metodo no permitido para esta ruta']);
-    }
-    exit;
-}
-
-responder(404, ['error' => 'Recurso no encontrado']);
+$manejadores[$rutaDeclarada->manejador]($resultado->parametros, $usuario);
 
 // ------------------------------------------------------------
 /** @return array<string, mixed> */
@@ -539,11 +270,11 @@ function exigirAutenticacion(string $secreto): array
  * Exige que el rol del usuario este dentro de los permitidos (RF19).
  * Si no, corta con 403.
  * @param array<string, mixed> $usuario
- * @param array<int, string> $rolesPermitidos
+ * @param list<string> $rolesPermitidos
  */
 function exigirRol(array $usuario, array $rolesPermitidos): void
 {
-    if (!in_array($usuario['rol'] ?? '', $rolesPermitidos, true)) {
+    if (!Permisos::puede(isset($usuario['rol']) ? (string) $usuario['rol'] : null, $rolesPermitidos)) {
         responder(403, ['error' => 'No tenés permisos para esta acción']);
         exit;
     }

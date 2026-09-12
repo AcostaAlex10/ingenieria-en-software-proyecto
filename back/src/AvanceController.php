@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sgso;
 
 use PDO;
+use Sgso\Reglas\CicloDeVida;
 
 /**
  * Controlador de Avances fisicos. Cada avance se carga contra una
@@ -220,7 +221,7 @@ final class AvanceController
               WHERE pl.id_planificacion = ?'
         );
         $stmt->execute([$planId]);
-        return $stmt->fetchColumn() === 'cancelada';
+        return !CicloDeVida::aceptaAvance((string) $stmt->fetchColumn());
     }
 
     private function sincronizarProyecto(string $planId): void
@@ -244,8 +245,8 @@ final class AvanceController
         $avanceReal = (float) $stmt->fetchColumn();
 
         $estado = $proyecto['estado'];
-        if ($avanceReal > 0 && $proyecto['estado'] === 'planificacion') {
-            $estado = 'en_ejecucion';
+        if (CicloDeVida::arrancaPorAvance((string) $proyecto['estado'], $avanceReal)) {
+            $estado = CicloDeVida::EN_EJECUCION;
         }
 
         $stmt = $this->db->prepare('UPDATE proyecto SET avance = ?, estado = ? WHERE id_proyecto = ?');

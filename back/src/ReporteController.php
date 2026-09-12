@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Sgso;
 
 use PDO;
+use Sgso\Reglas\CicloDeVida;
 
 /**
  * Reportes operativos de obra con flujo de aprobacion (RF21) y observaciones
@@ -143,7 +144,7 @@ final class ReporteController
                 return;
             }
             $estadoObra = $this->estadoObra($idProyecto);
-            if ($estadoObra !== 'en_ejecucion') {
+            if (!CicloDeVida::puedeEnviarReporteFinal((string) $estadoObra)) {
                 $this->json(409, [
                     'error' => 'Solo se puede enviar el reporte final de una obra en ejecución',
                 ]);
@@ -154,7 +155,7 @@ final class ReporteController
         $this->db->prepare('UPDATE reporte SET estado = ?, observacion_revision = NULL WHERE id_reporte = ?')
             ->execute(['en_revision', $id]);
 
-        $estadoProyecto = $esFinal ? $this->moverObra($idProyecto, 'en_revision') : null;
+        $estadoProyecto = $esFinal ? $this->moverObra($idProyecto, CicloDeVida::EN_REVISION) : null;
 
         $this->mostrarPorId((int) $id, 200, $estadoProyecto);
     }
@@ -222,11 +223,9 @@ final class ReporteController
         $estadoProyecto = null;
         if ((bool) $actual['es_final']) {
             $idProyecto = (string) $actual['id_proyecto'];
-            if ($this->estadoObra($idProyecto) === 'en_revision') {
-                $estadoProyecto = $this->moverObra(
-                    $idProyecto,
-                    $nuevoEstado === 'aprobado' ? 'finalizada' : 'en_ejecucion'
-                );
+            $destino = CicloDeVida::destinoTrasResolverFinal((string) $this->estadoObra($idProyecto), $nuevoEstado);
+            if ($destino !== null) {
+                $estadoProyecto = $this->moverObra($idProyecto, $destino);
             }
         }
 
